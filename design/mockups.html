@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VirtualFriends Mockups</title>
+<style>
+  /* ---------- gallery chrome ---------- */
+  :root { --g-bg: #f4f5f7; --g-text: #1d2129; --g-muted: #6a7280; --g-line: #dfe3ea; --g-card: #fff; --g-accent: #0b74ff; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --g-bg: #111318; --g-text: #e8eaef; --g-muted: #9aa1ad; --g-line: #2a2f3a; --g-card: #181b22; --g-accent: #5b9bff; }
+  }
+  :root[data-theme="dark"] { --g-bg: #111318; --g-text: #e8eaef; --g-muted: #9aa1ad; --g-line: #2a2f3a; --g-card: #181b22; --g-accent: #5b9bff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--g-bg); color: var(--g-text); font: 14px/1.5 "Segoe UI", system-ui, sans-serif; }
+  header.g { position: sticky; top: 0; z-index: 5; background: var(--g-bg); border-bottom: 1px solid var(--g-line); padding: 14px 16px; }
+  header.g h1 { margin: 0 0 8px; font-size: 18px; }
+  .g-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .g-row .lbl { color: var(--g-muted); font-size: 12px; margin-right: 4px; }
+  .chip { border: 1px solid var(--g-line); background: var(--g-card); color: var(--g-text); border-radius: 999px; padding: 4px 12px; cursor: pointer; font: inherit; }
+  .chip[aria-pressed="true"] { background: var(--g-accent); border-color: var(--g-accent); color: #fff; }
+  main.g { padding: 20px 16px 60px; max-width: 1400px; margin: 0 auto; }
+  .screen-title { font-size: 15px; font-weight: 600; margin: 24px 0 4px; }
+  .screen-note { color: var(--g-muted); margin: 0 0 12px; max-width: 80ch; }
+  .frames { display: grid; gap: 16px; }
+  .frames.all { grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)); }
+  .frame-cap { font-size: 12px; color: var(--g-muted); margin-bottom: 6px; }
+  .frames > div { min-width: 0; }
+  .scroller { overflow-x: auto; border-radius: 12px; max-width: 100%; }
+
+  /* ---------- app themes (same tokens as frontend/src/themes.css) ---------- */
+  [data-t="light"] { --bg: #eef2f7; --panel: #fff; --panel-2: #f5f7fb; --text: #1b2330; --muted: #6b7686; --accent: #0b74ff; --accent-text: #fff; --border: #e1e6ee;
+    --bubble-me: #0b74ff; --bubble-me-text: #fff; --bubble-other: #eef1f6; --bubble-other-text: #1b2330; --radius: 14px; --bubble-radius: 18px;
+    --shadow: 0 2px 12px rgba(20,40,80,.08); --font: "Segoe UI", system-ui, sans-serif; --titlebar-bg: transparent; --titlebar-text: var(--text); }
+  [data-t="dark"] { --bg: #0f1218; --panel: #171b23; --panel-2: #1e2430; --text: #e7ebf2; --muted: #8a94a6; --accent: #4c8dff; --accent-text: #fff; --border: #262d3a;
+    --bubble-me: #3b7bff; --bubble-me-text: #fff; --bubble-other: #232a37; --bubble-other-text: #e7ebf2; --radius: 14px; --bubble-radius: 18px;
+    --shadow: 0 2px 16px rgba(0,0,0,.4); --font: "Segoe UI", system-ui, sans-serif; --titlebar-bg: transparent; --titlebar-text: var(--text); }
+  [data-t="win95"] { --bg: #008080; --panel: #c0c0c0; --panel-2: #c0c0c0; --text: #000; --muted: #404040; --accent: #000080; --accent-text: #fff; --border: #808080;
+    --bubble-me: #000080; --bubble-me-text: #fff; --bubble-other: #fff; --bubble-other-text: #000; --radius: 0; --bubble-radius: 0; --shadow: none;
+    --font: "MS Sans Serif", "Microsoft Sans Serif", Tahoma, sans-serif; --titlebar-bg: linear-gradient(90deg,#000080,#1084d0); --titlebar-text: #fff; }
+  [data-t="aero"] { --bg: linear-gradient(180deg,#7fd3ff 0%,#c9f0ff 45%,#e8fff0 70%,#8fe08a 100%); --panel: rgba(255,255,255,.55); --panel-2: rgba(255,255,255,.35);
+    --text: #0d2a3d; --muted: #3c6177; --accent: #19a64a; --accent-text: #fff; --border: rgba(255,255,255,.8);
+    --bubble-me: linear-gradient(180deg,#8fe3ff 0%,#2aa6e6 50%,#1c8cd0 100%); --bubble-me-text: #fff;
+    --bubble-other: linear-gradient(180deg,#fff 0%,#eef9ff 50%,#dff2fb 100%); --bubble-other-text: #0d2a3d; --radius: 18px; --bubble-radius: 20px;
+    --shadow: 0 8px 30px rgba(0,90,140,.25), inset 0 1px 0 rgba(255,255,255,.9); --font: "Segoe UI", "Frutiger", system-ui, sans-serif;
+    --titlebar-bg: linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,255,255,.3)); --titlebar-text: #0d2a3d; }
+
+  .app { background: var(--bg); color: var(--text); font: 13px/1.45 var(--font); padding: 10px; border-radius: 12px; display: grid; gap: 10px; min-width: 980px; height: 560px;
+    grid-template-columns: 250px 1fr 270px; }
+  .app.two { grid-template-columns: 250px 1fr; }
+  .app.center { grid-template-columns: 1fr; place-items: center; }
+  .app.phone { min-width: 0; width: 330px; height: 640px; grid-template-columns: 1fr; padding: 0; border-radius: 28px; overflow: hidden; border: 8px solid #111; }
+  .w { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+  .tb { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--titlebar-bg); color: var(--titlebar-text); border-bottom: 1px solid var(--border); }
+  .tb b { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .b { border: 1px solid var(--border); background: var(--panel-2); padding: 4px 10px; border-radius: 9px; white-space: nowrap; }
+  .b.p { background: var(--accent); color: var(--accent-text); border-color: transparent; }
+  .in { border: 1px solid var(--border); background: var(--panel-2); border-radius: 9px; padding: 6px 10px; color: var(--muted); }
+  .av { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 600; font-size: 12px; flex: none; }
+  .c { display: flex; gap: 8px; padding: 8px 12px; align-items: center; }
+  .c.on { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .c .m { flex: 1; min-width: 0; }
+  .c .n { font-weight: 600; display: flex; justify-content: space-between; }
+  .c .pv { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bd { background: #ff3b5c; color: #fff; border-radius: 999px; font-size: 10px; padding: 0 6px; }
+  .msgs { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+  .r { display: flex; } .r.me { justify-content: flex-end; }
+  .bu { max-width: 72%; padding: 7px 11px; border-radius: var(--bubble-radius); background: var(--bubble-other); color: var(--bubble-other-text); }
+  .r.me .bu { background: var(--bubble-me); color: var(--bubble-me-text); }
+  .q { border-left: 3px solid currentColor; opacity: .75; padding-left: 6px; font-size: 11px; margin-bottom: 3px; }
+  .rx { display: inline-block; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 999px; font-size: 11px; padding: 0 6px; margin-top: 3px; }
+  .time { text-align: center; color: var(--muted); font-size: 11px; }
+  .comp { border-top: 1px solid var(--border); padding: 8px; display: flex; gap: 6px; align-items: center; }
+  .comp .in { flex: 1; }
+  .stage { flex: 1; display: grid; place-items: center; position: relative; background: radial-gradient(ellipse at 50% 30%, color-mix(in srgb, var(--accent) 25%, transparent), transparent 70%); }
+  .chip2 { position: absolute; top: 10px; left: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; font-size: 11px; }
+  .sg { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 10px; }
+  .st { aspect-ratio: 1; border-radius: 12px; display: grid; place-items: center; font-size: 34px; background: var(--panel-2); }
+  .fld { display: grid; gap: 3px; } .fld span { font-size: 11px; color: var(--muted); }
+  .wave { display: flex; gap: 2px; align-items: center; height: 18px; }
+  .wave i { width: 3px; background: var(--accent); border-radius: 2px; }
+
+  [data-t="win95"] .w, [data-t="win95"] .b { border: 2px solid; border-color: #fff #000 #000 #fff; box-shadow: inset -1px -1px #808080, inset 1px 1px #dfdfdf; }
+  [data-t="win95"] .in { background: #fff; border: 2px solid; border-color: #808080 #fff #fff #808080; border-radius: 0; color: #000; }
+  [data-t="win95"] .tb { padding: 3px 6px; font-weight: bold; }
+  [data-t="win95"] .tb::after { content: "_ □ ×"; font-family: monospace; background: #c0c0c0; color: #000; padding: 0 4px; border: 2px solid; border-color: #fff #000 #000 #fff; letter-spacing: 3px; }
+  [data-t="win95"] .bu { border: 1px solid #000; }
+  [data-t="win95"] .av, [data-t="win95"] .bd, [data-t="win95"] .st { border-radius: 0; }
+  [data-t="win95"] .c.on { background: #000080; color: #fff; } [data-t="win95"] .c.on .pv { color: #ddd; }
+  [data-t="win95"] .app.phone { border-radius: 0; border-color: #c0c0c0; }
+  [data-t="aero"] .w { backdrop-filter: blur(14px) saturate(140%); }
+  [data-t="aero"] .b { background: linear-gradient(180deg,#fff 0%,#e3f4ff 49%,#c4e6fb 50%,#e6f7ff 100%); border: 1px solid #7ab8dd; border-radius: 999px; }
+  [data-t="aero"] .b.p { background: linear-gradient(180deg,#b6f59c 0%,#4cc94b 49%,#23a73a 50%,#5fd65a 100%); border-color: #1c8a31; color: #fff; }
+  [data-t="aero"] .bu { box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 2px 6px rgba(0,80,120,.2); border: 1px solid rgba(255,255,255,.7); }
+  [data-t="aero"] .av { box-shadow: 0 0 0 2px #fff, 0 2px 8px rgba(0,80,140,.4); }
+</style>
+</head>
+<body>
+<header class="g">
+  <h1>VirtualFriends: mock screens</h1>
+  <div class="g-row" role="group" aria-label="Theme">
+    <span class="lbl">Theme</span>
+    <button class="chip" data-theme-btn="light">☀️ Light</button>
+    <button class="chip" data-theme-btn="dark">🌙 Dark</button>
+    <button class="chip" data-theme-btn="win95">🖥️ Windows 95</button>
+    <button class="chip" data-theme-btn="aero">🫧 Frutiger Aero</button>
+    <button class="chip" data-theme-btn="all">Compare all 4</button>
+  </div>
+  <div class="g-row" role="group" aria-label="Screen" style="margin-top:8px">
+    <span class="lbl">Screen</span>
+    <button class="chip" data-screen-btn="bot">AI friend chat</button>
+    <button class="chip" data-screen-btn="chat">Group chat</button>
+    <button class="chip" data-screen-btn="stickers">Sticker packs</button>
+    <button class="chip" data-screen-btn="studio">Create AI friend</button>
+    <button class="chip" data-screen-btn="login">Sign in</button>
+    <button class="chip" data-screen-btn="mobile">Mobile</button>
+  </div>
+</header>
+<main class="g">
+  <div class="screen-title" id="title"></div>
+  <p class="screen-note" id="note"></p>
+  <div class="frames" id="frames"></div>
+</main>
+
+<script>
+const stick = (color = '#ff6fae', size = 230) => `
+<svg width="${size}" height="${size * 1.25}" viewBox="0 0 200 250" aria-label="Stick figure avatar">
+  <g stroke="${color}" stroke-width="7" stroke-linecap="round" fill="none">
+    <line x1="100" y1="92" x2="100" y2="165"/><line x1="100" y1="165" x2="78" y2="235"/><line x1="100" y1="165" x2="122" y2="235"/>
+    <line x1="100" y1="105" x2="45" y2="62"/><line x1="100" y1="105" x2="158" y2="70"/>
+  </g>
+  <circle cx="100" cy="58" r="36" fill="#fff6ee" stroke="${color}" stroke-width="3"/>
+  <path d="M64 55 A36 36 0 0 1 136 55 Q118 36 100 42 Q82 36 64 55Z" fill="${color}"/>
+  <circle cx="88" cy="60" r="4.5" fill="#222"/><circle cx="112" cy="60" r="4.5" fill="#222"/>
+  <path d="M80 49 l14 -3 M120 49 l-14 -3" stroke="#333" stroke-width="2.5" stroke-linecap="round"/>
+  <ellipse cx="78" cy="70" rx="6" ry="3.5" fill="#ff7aa0" opacity=".55"/><ellipse cx="122" cy="70" rx="6" ry="3.5" fill="#ff7aa0" opacity=".55"/>
+  <path d="M89 72 Q100 86 111 72 Z" fill="#c0304a"/>
+</svg>`;
+
+const av = (txt, g = 'linear-gradient(135deg,#ff8ac6,#7f8cff)') => `<div class="av" style="background:${g}">${txt}</div>`;
+
+const sidebar = (active) => `
+<div class="w">
+  <div class="tb">${av('LM')}<b>Lê Minh</b><span>⎋</span></div>
+  <div style="padding:8px;display:grid;gap:6px">
+    <div class="in">🔎 Search chats or people</div>
+    <div style="display:flex;gap:6px"><span class="b p">+ AI friend</span><span class="b">Stickers</span><span class="b">Theme ▾</span></div>
+  </div>
+  <div style="flex:1;overflow:hidden">
+    <div class="c ${active === 'bot' ? 'on' : ''}">${av('MI', 'linear-gradient(135deg,#ff6fae,#ffb36b)')}<div class="m"><div class="n"><span>🤖 Mika</span></div><div class="pv">えへへ、ラーメン食べに行こう！</div></div></div>
+    <div class="c ${active === 'chat' ? 'on' : ''}">${av('ĐH', 'linear-gradient(135deg,#2fbf71,#0b74ff)')}<div class="m"><div class="n"><span>📌 Đồ án nhóm 5</span><span class="bd">3</span></div><div class="pv">Huy: [Sticker]</div></div></div>
+    <div class="c">${av('AN')}<div class="m"><div class="n"><span>An Nguyễn</span></div><div class="pv">You: Mai gặp nhé 👋</div></div></div>
+    <div class="c">${av('KA', 'linear-gradient(135deg,#4c8dff,#7f5cff)')}<div class="m"><div class="n"><span>🤖 Kaito</span><span class="bd">1</span></div><div class="pv">Good morning! Ready for leg day?</div></div></div>
+    <div class="c">${av('JS', 'linear-gradient(135deg,#ffb36b,#ff5c7a)')}<div class="m"><div class="n"><span>Ji-su</span></div><div class="pv">ㅋㅋㅋ 진짜?</div></div></div>
+  </div>
+</div>`;
+
+const composer = `<div class="comp"><span class="b">😊</span><span class="b">🧸</span><span class="b">📎</span><div class="in">Message…</div><span class="b p">Send</span></div>`;
+
+const SCREENS = {
+  bot: {
+    title: 'AI friend chat with avatar',
+    note: 'A 1:1 chat with a bot character. The right panel renders the avatar (a stick figure placeholder here; VRM, glTF, Live2D or Unity when imported). The face follows the [emotion] tag in each reply and the mouth follows the TTS audio. 🔊 on a bubble replays it.',
+    html: () => `<div class="app">${sidebar('bot')}
+      <div class="w"><div class="tb"><b>🤖 Mika</b><span style="color:var(--muted);font-size:11px">AI friend</span><span class="b">📌</span><span class="b">🔔</span></div>
+        <div class="msgs">
+          <div class="time">Today</div>
+          <div class="r me"><div class="bu">Mika, hôm nay stream game gì vậy?</div></div>
+          <div class="r"><div class="bu">Hôm nay mình chơi rhythm game nè! Bạn có muốn thử thách mình không? 🔊</div></div>
+          <div class="r me"><div class="bu">日本語でも話せる？</div></div>
+          <div class="r"><div class="bu">もちろん！えへへ、配信の後でラーメン食べに行こう！🔊<br><span class="rx">❤️ 1</span></div></div>
+          <div class="r me"><div class="bu" style="background:none;padding:0;font-size:56px">🍜</div></div>
+          <div style="color:var(--muted);font-size:11px">Mika is typing…</div>
+        </div>${composer}</div>
+      <div class="w"><div class="tb"><b>Mika</b><span class="b">🔊</span><span class="b">⚙️</span></div>
+        <div class="stage">${stick('#ff6fae', 190)}<span class="chip2">😊 happy · speaking</span></div>
+        <div style="padding:10px;display:grid;gap:6px">
+          <div class="wave">${Array.from({ length: 28 }, (_, i) => `<i style="height:${4 + Math.abs(Math.sin(i * 0.9)) * 14}px"></i>`).join('')}</div>
+          <div style="font-size:11px;color:var(--muted)">Voice: elevenlabs · Language: ja · Model: placeholder</div>
+        </div></div></div>`,
+  },
+  chat: {
+    title: 'Group chat',
+    note: 'Messenger/Zalo patterns: sender names in groups, reply quotes, reactions, stickers, photos, edited and recalled messages, pin and mute, typing indicator, and a sticker tray in the composer.',
+    html: () => `<div class="app two">${sidebar('chat')}
+      <div class="w" style="position:relative"><div class="tb"><b>Đồ án nhóm 5</b><span style="color:var(--muted);font-size:11px">4 members</span><span class="b">📌</span><span class="b">🔔</span></div>
+        <div class="msgs">
+          <div class="time">Yesterday</div>
+          <div class="r"><div><div style="font-size:11px;color:var(--muted)">Huy</div><div class="bu">Slide phần backend xong chưa mọi người?</div></div></div>
+          <div class="r me"><div class="bu"><div class="q">Slide phần backend xong chưa mọi người?</div>Xong rồi, mình up lên Drive nha <span style="opacity:.7;font-size:10px">(edited)</span><br><span class="rx">👍 3</span></div></div>
+          <div class="r"><div><div style="font-size:11px;color:var(--muted)">Thảo</div><div class="bu" style="font-style:italic;opacity:.7">Message recalled</div></div></div>
+          <div class="time">Today</div>
+          <div class="r"><div><div style="font-size:11px;color:var(--muted)">Huy</div><div class="bu" style="background:none;padding:0"><div class="st" style="width:110px;font-size:60px;background:none">🐧</div></div></div></div>
+          <div class="r me"><div class="bu" style="padding:4px"><div style="width:200px;height:110px;border-radius:10px;background:linear-gradient(135deg,#7fd3ff,#ffb3d9);display:grid;place-items:center;color:#fff">📷 photo.jpg</div></div></div>
+        </div>
+        <div style="position:absolute;bottom:52px;left:10px;width:330px" class="w">
+          <div style="display:flex;gap:4px;padding:6px;border-bottom:1px solid var(--border);font-size:12px"><b style="background:var(--panel-2);padding:2px 8px;border-radius:8px">Penguins</b><span style="padding:2px 8px">Mika pack</span><span style="padding:2px 8px">Memes</span></div>
+          <div class="sg" style="grid-template-columns:repeat(5,1fr)">${['🐧', '🐧‍⬛', '😴', '🎉', '🙏', '🍜', '☕', '💢', '🫶', '🌸'].map((e) => `<div class="st" style="font-size:26px">${e}</div>`).join('')}</div>
+        </div>${composer}</div></div>`,
+  },
+  stickers: {
+    title: 'Sticker packs: import and create',
+    note: 'Packs belong to each user. Sources: this device, Google Drive (Picker) and OneDrive (File Picker). The sticker maker adds a caption and a white die-cut border, then exports a 512px PNG. SVGs are sanitized before upload.',
+    html: () => `<div class="app center"><div class="w" style="width:640px">
+      <div class="tb"><b>Sticker packs</b><span>✕</span></div>
+      <div style="padding:12px;display:grid;gap:10px">
+        <div style="display:flex;gap:8px"><div class="in" style="flex:1">Penguins (10) ▾</div><span class="b">+ New pack</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="b p">From this device</span><span class="b">Google Drive</span><span class="b">OneDrive</span><span class="b">✏️ Create sticker</span></div>
+        <div class="w" style="display:grid;grid-template-columns:150px 1fr;gap:12px;padding:10px">
+          <div style="width:150px;height:150px;border-radius:10px;background:repeating-conic-gradient(#eee 0 25%,#fff 0 50%) 0 0/16px 16px;display:grid;place-items:center;position:relative">
+            <span style="font-size:80px;filter:drop-shadow(0 0 0 #fff) drop-shadow(3px 0 0 #fff) drop-shadow(-3px 0 0 #fff) drop-shadow(0 3px 0 #fff)">🐧</span>
+            <span style="position:absolute;bottom:8px;font:900 22px sans-serif;color:#fff;-webkit-text-stroke:1.5px #000">CẢM ƠN!</span></div>
+          <div style="display:grid;gap:8px;align-content:start">
+            <div class="in">penguin.png</div><div class="in" style="color:var(--text)">CẢM ƠN!</div>
+            <div>🎨 Text color &nbsp; ☑ White die-cut border</div>
+            <div style="display:flex;gap:6px"><span class="b">Cancel</span><span class="b p">Add to pack</span></div>
+          </div>
+        </div>
+        <div class="sg">${['🐧', '😴', '🎉', '🙏', '🍜', '☕', '💢', '🫶', '🌸', '🐧‍⬛', '✨', '🔥'].map((e) => `<div class="st">${e}</div>`).join('')}</div>
+      </div></div></div>`,
+  },
+  studio: {
+    title: 'Create an AI friend',
+    note: 'Character sheet, main language (vi/en/zh/ja/ko/es/ru), voice engine (engines without an API key show as "not configured"), voice, and avatar model. Import accepts VRM, glTF/GLB from Blender, a Live2D folder, or a Unity WebGL build.',
+    html: () => `<div class="app center"><div class="w" style="width:560px">
+      <div class="tb"><b>Create an AI friend</b><span>✕</span></div>
+      <div style="padding:14px;display:grid;gap:10px">
+        <label class="fld"><span>Name</span><div class="in" style="color:var(--text)">Mika</div></label>
+        <label class="fld"><span>Personality / character sheet</span><div class="in" style="color:var(--text);height:72px">Cheerful idol VTuber who streams rhythm games and loves ramen. Talks with lots of energy, teases the user playfully, never mean.</div></label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <label class="fld"><span>Main language</span><div class="in" style="color:var(--text)">日本語 ▾</div></label>
+          <label class="fld"><span>Voice engine</span><div class="in" style="color:var(--text)">COEIROINK (Japanese, local) ▾</div></label>
+        </div>
+        <label class="fld"><span>Voice</span><div class="in" style="color:var(--text)">つくよみちゃん / れいせい ▾</div></label>
+        <label class="fld"><span>Avatar</span><div style="display:flex;gap:8px"><div class="in" style="flex:1;color:var(--text)">Stick Mika (pink) · PLACEHOLDER ▾</div><span class="b">Import model…</span></div></label>
+        <div style="display:flex;gap:12px;align-items:center">${stick('#ff6fae', 70)}${stick('#4c8dff', 70)}${stick('#2fbf71', 70)}<span style="color:var(--muted);font-size:11px">Built-in placeholders</span></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px"><span class="b">Cancel</span><span class="b p">Create &amp; chat</span></div>
+      </div></div></div>`,
+  },
+  login: {
+    title: 'Sign in',
+    note: 'Username and password, with JWT stored client-side. The chosen theme is saved to the profile.',
+    html: () => `<div class="app center"><div class="w" style="width:360px">
+      <div class="tb"><b>VirtualFriends — Sign in</b></div>
+      <div style="padding:16px;display:grid;gap:10px">
+        <div style="display:grid;place-items:center">${stick('#ff6fae', 90)}</div>
+        <label class="fld"><span>Username</span><div class="in">leminh</div></label>
+        <label class="fld"><span>Password</span><div class="in">••••••••</div></label>
+        <span class="b p" style="text-align:center">Sign in</span>
+        <span class="b" style="text-align:center">New here? Create an account</span>
+      </div></div></div>`,
+  },
+  mobile: {
+    title: 'Mobile',
+    note: 'Below 720px the layout collapses to one column: the chat list, then the chat with a back button. The avatar panel moves behind the ⚙️ button.',
+    html: () => `<div style="display:flex;gap:20px;flex-wrap:wrap">
+      <div class="app phone">${sidebar('none')}</div>
+      <div class="app phone"><div class="w" style="border-radius:0">
+        <div class="tb"><span class="b">←</span><b>🤖 Mika</b><span class="b">⚙️</span></div>
+        <div style="height:170px" class="stage">${stick('#ff6fae', 110)}<span class="chip2">😊 happy</span></div>
+        <div class="msgs">
+          <div class="r me"><div class="bu">Chào Mika!</div></div>
+          <div class="r"><div class="bu">Chào bạn! Hôm nay bạn thế nào? 🔊</div></div>
+          <div class="r me"><div class="bu">Mệt quá 😴</div></div>
+          <div class="r"><div class="bu">Vậy nghỉ chút đi, mình hát cho bạn nghe nhé~ 🔊</div></div>
+        </div>${composer}</div></div></div>`,
+  },
+};
+
+const LABEL = { light: 'Light', dark: 'Dark', win95: 'Windows 95', aero: 'Frutiger Aero' };
+let theme = 'light';
+let screen = 'bot';
+try { theme = localStorage.getItem('mock.theme') || theme; screen = localStorage.getItem('mock.screen') || screen; } catch (e) { /* storage unavailable */ }
+
+function render() {
+  const s = SCREENS[screen];
+  document.getElementById('title').textContent = s.title;
+  document.getElementById('note').textContent = s.note;
+  const frames = document.getElementById('frames');
+  const themes = theme === 'all' ? Object.keys(LABEL) : [theme];
+  frames.className = `frames ${theme === 'all' ? 'all' : ''}`;
+  frames.innerHTML = themes.map((t) => `<div><div class="frame-cap">${LABEL[t]}</div><div class="scroller"><div data-t="${t}">${s.html()}</div></div></div>`).join('');
+  document.querySelectorAll('[data-theme-btn]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.themeBtn === theme));
+  document.querySelectorAll('[data-screen-btn]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.screenBtn === screen));
+  try { localStorage.setItem('mock.theme', theme); localStorage.setItem('mock.screen', screen); } catch (e) { /* ignore */ }
+}
+document.querySelectorAll('[data-theme-btn]').forEach((b) => b.addEventListener('click', () => { theme = b.dataset.themeBtn; render(); }));
+document.querySelectorAll('[data-screen-btn]').forEach((b) => b.addEventListener('click', () => { screen = b.dataset.screenBtn; render(); }));
+render();
+</script>
+</body>
+</html>

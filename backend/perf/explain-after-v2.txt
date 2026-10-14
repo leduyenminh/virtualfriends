@@ -1,0 +1,199 @@
+=== 1. Chat list: my memberships + conversation (MemberRepo.findMineWithConversation) ===
+                                                   QUERY PLAN                                                   
+----------------------------------------------------------------------------------------------------------------
+ Sort (actual time=14.239..14.263 rows=300 loops=1)
+   Sort Key: m.pinned DESC, c.updated_at DESC
+   Sort Method: quicksort  Memory: 67kB
+   Buffers: shared hit=432 read=3
+   I/O Timings: shared read=0.034
+   ->  Hash Left Join (actual time=0.354..13.508 rows=300 loops=1)
+         Hash Cond: (c.bot_id = b.id)
+         Buffers: shared hit=424 read=3
+         I/O Timings: shared read=0.034
+         ->  Hash Join (actual time=0.321..13.405 rows=300 loops=1)
+               Hash Cond: (c.id = m.conversation_id)
+               Buffers: shared hit=424 read=3
+               I/O Timings: shared read=0.034
+               ->  Seq Scan on conversation c (actual time=0.010..5.490 rows=50000 loops=1)
+                     Buffers: shared hit=417
+               ->  Hash (actual time=0.270..0.274 rows=300 loops=1)
+                     Buckets: 1024  Batches: 1  Memory Usage: 37kB
+                     Buffers: shared hit=7 read=3
+                     I/O Timings: shared read=0.034
+                     ->  Bitmap Heap Scan on conversation_member m (actual time=0.107..0.168 rows=300 loops=1)
+                           Recheck Cond: (user_id = 'c5428234-653a-47cc-9a05-7a51a8c58687'::uuid)
+                           Heap Blocks: exact=4
+                           Buffers: shared hit=7 read=3
+                           I/O Timings: shared read=0.034
+                           ->  Bitmap Index Scan on idx_member_user (actual time=0.092..0.093 rows=300 loops=1)
+                                 Index Cond: (user_id = 'c5428234-653a-47cc-9a05-7a51a8c58687'::uuid)
+                                 Buffers: shared hit=3 read=3
+                                 I/O Timings: shared read=0.034
+         ->  Hash (actual time=0.006..0.008 rows=0 loops=1)
+               Buckets: 1024  Batches: 1  Memory Usage: 8kB
+               ->  Nested Loop Left Join (actual time=0.006..0.007 rows=0 loops=1)
+                     Join Filter: (a.id = b.avatar_model_id)
+                     ->  Seq Scan on bot_character b (actual time=0.005..0.006 rows=0 loops=1)
+                     ->  Seq Scan on avatar_model a (never executed)
+ Planning:
+   Buffers: shared hit=327 read=3
+   I/O Timings: shared read=0.049
+ Planning Time: 5.581 ms
+ Execution Time: 14.564 ms
+(39 rows)
+
+=== 2. Newest message per chat (MessageRepo.findLatestPerConversation) ===
+                                                          QUERY PLAN                                                          
+------------------------------------------------------------------------------------------------------------------------------
+ Nested Loop (actual time=8.098..14.430 rows=300 loops=1)
+   Buffers: shared hit=4208
+   ->  HashAggregate (actual time=8.031..8.131 rows=300 loops=1)
+         Group Key: (SubPlan 1)
+         Batches: 1  Memory Usage: 61kB
+         Buffers: shared hit=1808
+         ->  Nested Loop (actual time=0.082..7.685 rows=300 loops=1)
+               Buffers: shared hit=1808
+               ->  Index Only Scan using idx_member_user on conversation_member (actual time=0.024..0.171 rows=300 loops=1)
+                     Index Cond: (user_id = 'c5428234-653a-47cc-9a05-7a51a8c58687'::uuid)
+                     Heap Fetches: 0
+                     Buffers: shared hit=7
+               ->  Index Only Scan using conversation_pkey on conversation c (actual time=0.006..0.006 rows=1 loops=300)
+                     Index Cond: (id = conversation_member.conversation_id)
+                     Heap Fetches: 0
+                     Buffers: shared hit=601
+               SubPlan 1
+                 ->  Limit (actual time=0.014..0.014 rows=1 loops=600)
+                       Buffers: shared hit=2400
+                       ->  Index Scan using idx_message_conv_created on message x (actual time=0.013..0.013 rows=1 loops=600)
+                             Index Cond: (conversation_id = c.id)
+                             Buffers: shared hit=2400
+   ->  Index Scan using message_pkey on message m (actual time=0.008..0.008 rows=1 loops=300)
+         Index Cond: (id = (SubPlan 1))
+         Buffers: shared hit=1200
+ Planning:
+   Buffers: shared hit=164 read=3
+   I/O Timings: shared read=0.049
+ Planning Time: 3.042 ms
+ Execution Time: 14.836 ms
+(30 rows)
+
+=== 3. Unread counts (MessageRepo.countUnreadByConversation) ===
+                                                                                QUERY PLAN                                                                                
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Finalize GroupAggregate (actual time=54.980..62.146 rows=150 loops=1)
+   Group Key: cm.conversation_id
+   Buffers: shared hit=72471
+   ->  Gather Merge (actual time=54.969..62.089 rows=150 loops=1)
+         Workers Planned: 1
+         Workers Launched: 1
+         Buffers: shared hit=72471
+         ->  Sort (actual time=46.454..46.461 rows=75 loops=2)
+               Sort Key: cm.conversation_id
+               Sort Method: quicksort  Memory: 28kB
+               Buffers: shared hit=72471
+               Worker 0:  Sort Method: quicksort  Memory: 28kB
+               ->  Partial HashAggregate (actual time=46.325..46.346 rows=75 loops=2)
+                     Group Key: cm.conversation_id
+                     Batches: 1  Memory Usage: 37kB
+                     Buffers: shared hit=72464
+                     Worker 0:  Batches: 1  Memory Usage: 37kB
+                     ->  Nested Loop (actual time=0.134..40.554 rows=19146 loops=2)
+                           Buffers: shared hit=72464
+                           ->  Parallel Seq Scan on conversation_member cm (actual time=0.017..5.362 rows=150 loops=2)
+                                 Filter: (user_id = 'c5428234-653a-47cc-9a05-7a51a8c58687'::uuid)
+                                 Rows Removed by Filter: 49850
+                                 Buffers: shared hit=1235
+                           ->  Index Scan using idx_message_conv_created on message m (actual time=0.100..0.211 rows=128 loops=300)
+                                 Index Cond: ((conversation_id = cm.conversation_id) AND (created_at > COALESCE(cm.last_read_at, '-infinity'::timestamp with time zone)))
+                                 Filter: ((sender_id IS NULL) OR (sender_id <> cm.user_id))
+                                 Rows Removed by Filter: 120
+                                 Buffers: shared hit=71229
+ Planning:
+   Buffers: shared hit=24
+ Planning Time: 0.904 ms
+ Execution Time: 62.483 ms
+(32 rows)
+
+=== 4. Message history page, keyset pagination (MessageRepo.page) ===
+                                                   QUERY PLAN                                                    
+-----------------------------------------------------------------------------------------------------------------
+ Limit (actual time=0.067..0.118 rows=50 loops=1)
+   Buffers: shared hit=49
+   ->  Index Scan using idx_message_conv_created on message m (actual time=0.065..0.109 rows=50 loops=1)
+         Index Cond: ((conversation_id = '0907babb-186e-43b6-a9ad-2113e6a20a07'::uuid) AND (created_at < now()))
+         Buffers: shared hit=49
+ Planning:
+   Buffers: shared hit=38 read=1
+   I/O Timings: shared read=0.020
+ Planning Time: 1.483 ms
+ Execution Time: 0.293 ms
+(10 rows)
+
+=== 4b. Same page with OFFSET 900 (why the app does NOT use offset paging) ===
+                                                  QUERY PLAN                                                  
+--------------------------------------------------------------------------------------------------------------
+ Limit (actual time=1.782..1.796 rows=50 loops=1)
+   Buffers: shared hit=27
+   ->  Sort (actual time=1.134..1.724 rows=950 loops=1)
+         Sort Key: created_at DESC
+         Sort Method: quicksort  Memory: 187kB
+         Buffers: shared hit=27
+         ->  Bitmap Heap Scan on message m (actual time=0.098..0.314 rows=1040 loops=1)
+               Recheck Cond: (conversation_id = '0907babb-186e-43b6-a9ad-2113e6a20a07'::uuid)
+               Heap Blocks: exact=18
+               Buffers: shared hit=27
+               ->  Bitmap Index Scan on idx_message_conv_created (actual time=0.085..0.086 rows=1040 loops=1)
+                     Index Cond: (conversation_id = '0907babb-186e-43b6-a9ad-2113e6a20a07'::uuid)
+                     Buffers: shared hit=9
+ Planning:
+   Buffers: shared hit=2
+ Planning Time: 0.340 ms
+ Execution Time: 2.060 ms
+(17 rows)
+
+=== 5. People search (UserRepo.search) ===
+                                                           QUERY PLAN                                                           
+--------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=0.178..0.182 rows=11 loops=1)
+   Buffers: shared hit=19
+   ->  Sort (actual time=0.177..0.179 rows=11 loops=1)
+         Sort Key: username
+         Sort Method: quicksort  Memory: 26kB
+         Buffers: shared hit=19
+         ->  Bitmap Heap Scan on app_user u (actual time=0.107..0.117 rows=11 loops=1)
+               Recheck Cond: ((lower((username)::text) ~~ '%r1234%'::text) OR (lower((display_name)::text) ~~ '%r1234%'::text))
+               Heap Blocks: exact=2
+               Buffers: shared hit=16
+               ->  BitmapOr (actual time=0.089..0.089 rows=0 loops=1)
+                     Buffers: shared hit=14
+                     ->  Bitmap Index Scan on idx_user_username_trgm (actual time=0.061..0.061 rows=11 loops=1)
+                           Index Cond: (lower((username)::text) ~~ '%r1234%'::text)
+                           Buffers: shared hit=7
+                     ->  Bitmap Index Scan on idx_user_display_trgm (actual time=0.027..0.027 rows=0 loops=1)
+                           Index Cond: (lower((display_name)::text) ~~ '%r1234%'::text)
+                           Buffers: shared hit=7
+ Planning:
+   Buffers: shared hit=55
+ Planning Time: 2.080 ms
+ Execution Time: 0.562 ms
+(22 rows)
+
+=== 6. Deleting a user: ON DELETE SET NULL on message.sender_id (rolled back) ===
+BEGIN
+                                             QUERY PLAN                                             
+----------------------------------------------------------------------------------------------------
+ Delete on app_user (actual time=0.478..0.479 rows=0 loops=1)
+   ->  Index Scan using app_user_username_key on app_user (actual time=0.102..0.104 rows=1 loops=1)
+         Index Cond: ((username)::text = 'user19999'::text)
+ Planning Time: 0.191 ms
+ Trigger for constraint avatar_model_owner_id_fkey: time=0.443 calls=1
+ Trigger for constraint bot_character_owner_id_fkey: time=0.166 calls=1
+ Trigger for constraint conversation_member_user_id_fkey: time=0.321 calls=1
+ Trigger for constraint sticker_pack_owner_id_fkey: time=1.560 calls=1
+ Trigger for constraint message_sender_id_fkey: time=0.544 calls=1
+ Trigger for constraint message_reaction_user_id_fkey: time=1.742 calls=1
+ Trigger for constraint user_identity_user_id_fkey: time=1.285 calls=1
+ Execution Time: 7.025 ms
+(12 rows)
+
+ROLLBACK

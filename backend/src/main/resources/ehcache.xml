@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Hibernate 2nd-level cache (per JVM, in-heap). Only read-mostly reference data is cached here:
+  stickers never change after upload, avatar models are immutable, bots change rarely.
+  Chat data (messages, conversations, members) is deliberately NOT cached: it changes constantly and
+  must stay consistent across backend instances. Shared, cross-instance caching goes through Redis instead.
+-->
+<config xmlns="http://www.ehcache.org/v3" xmlns:jsr107="http://www.ehcache.org/v3/jsr107">
+  <service>
+    <jsr107:defaults enable-statistics="true"/>
+  </service>
+
+  <cache-template name="reference">
+    <expiry><ttl unit="minutes">30</ttl></expiry>
+    <heap unit="entries">5000</heap>
+  </cache-template>
+
+  <cache alias="com.vchat.domain.Sticker" uses-template="reference"/>
+  <cache alias="com.vchat.domain.StickerPack" uses-template="reference"/>
+  <cache alias="com.vchat.domain.StickerPack.stickers" uses-template="reference"/>
+  <cache alias="com.vchat.domain.AvatarModel" uses-template="reference"/>
+  <cache alias="com.vchat.domain.BotCharacter" uses-template="reference">
+    <expiry><ttl unit="minutes">5</ttl></expiry>
+    <heap unit="entries">2000</heap>
+  </cache>
+</config>

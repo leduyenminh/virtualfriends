@@ -1,0 +1,138 @@
+server:
+  port: ${PORT:8080}
+  # Honour X-Forwarded-* from the ALB / Vite proxy so OAuth redirect URLs use the public host
+  forward-headers-strategy: framework
+
+spring:
+  application.name: vchat
+  # Java 21 virtual threads: request threads block on Claude/TTS/DB calls without exhausting a platform-thread pool
+  threads.virtual.enabled: true
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/vchat}
+    username: ${DB_USER:vchat}
+    password: ${DB_PASSWORD:vchat}
+    hikari:
+      # Small pools are faster: Postgres throughput peaks at roughly (2 x cores) active connections
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      minimum-idle: 2
+      connection-timeout: 5000
+      leak-detection-threshold: ${DB_LEAK_DETECTION_MS:0}
+      data-source-properties:
+        reWriteBatchedInserts: true   # pgjdbc turns JDBC batches into multi-row INSERTs
+
+  jpa:
+    hibernate.ddl-auto: validate
+    open-in-view: false               # no lazy loading from controllers/views (hidden N+1 source)
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+        # Lazy associations load in batches of up to 50 ids (IN-list) instead of one query per row
+        default_batch_fetch_size: 50
+        query:
+          in_clause_parameter_padding: true             # fewer distinct SQL strings -> better plan-cache reuse
+          fail_on_pagination_over_collection_fetch: true # never paginate a collection fetch in memory
+        generate_statistics: ${HIBERNATE_STATS:false}
+        session.events.log.LOG_QUERIES_SLOWER_THAN_MS: ${SLOW_QUERY_MS:200}
+        cache:
+          use_second_level_cache: true
+          use_query_cache: false
+          region.factory_class: jcache
+        javax.cache:
+          provider: org.ehcache.jsr107.EhcacheCachingProvider
+          uri: classpath:ehcache.xml
+          missing_cache_strategy: fail
+
+  flyway.enabled: true
+
+  servlet.multipart:
+    max-file-size: 50MB
+    max-request-size: 50MB
+
+  data.redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    ssl.enabled: ${REDIS_SSL:false}
+    timeout: 2s
+    connect-timeout: 1s
+    repositories.enabled: false
+
+  cache:
+    type: redis
+    redis.time-to-live: 1h
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
+        linger.ms: 5
+        max.block.ms: 5000   # never hang a request thread for 60s if Kafka is down
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+
+management:
+  endpoints.web.exposure.include: health,info,metrics
+  endpoint.health.probes.enabled: true
+
+logging:
+  level:
+    root: INFO
+    com.vchat: ${LOG_LEVEL:INFO}
+    org.hibernate.SQL_SLOW: INFO
+  pattern:
+    console: "%clr(%d{HH:mm:ss.SSS}){faint} %clr(%5p) %clr([%X{requestId:-}]){magenta} %clr(%-36.36logger{35}){cyan} : %m%n%wEx"
+
+vchat:
+  # No default on purpose. Required (>= 32 chars) under the aws/prod profiles; a random per-run key is used in dev.
+  jwt-secret: ${JWT_SECRET:}
+  auth:
+    access-ttl-minutes: ${ACCESS_TTL_MINUTES:15}
+    refresh-ttl-days: ${REFRESH_TTL_DAYS:30}
+    # auto = Secure flag when the request is HTTPS. Set true behind a TLS-terminating proxy (CloudFront -> ALB over http)
+    cookie-secure: ${COOKIE_SECURE:auto}
+    # Two tabs refreshing at the same moment present the same token; reuse within this window is not treated as theft
+    reuse-grace-seconds: ${REFRESH_REUSE_GRACE_SECONDS:30}
+    # Comma-separated usernames promoted to ADMIN at startup / sign-in
+    admin-usernames: ${ADMIN_USERNAMES:}
+  cors-origins: ${CORS_ORIGINS:http://localhost:5173}
+  # Where the browser app lives; OAuth logins redirect back here
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  storage:
+    # LOCAL writes to ./uploads and serves /files/**; S3 for AWS
+    mode: ${STORAGE_MODE:LOCAL}
+    bucket: ${MEDIA_BUCKET:vchat-media}
+    region: ${AWS_REGION:ap-southeast-1}
+    public-base-url: ${MEDIA_BASE_URL:http://localhost:8080/files}
+  ai:
+    model: ${CLAUDE_MODEL:claude-opus-5-5}
+  tts:
+    elevenlabs-api-key: ${ELEVENLABS_API_KEY:}
+    elevenlabs-model: eleven_multilingual_v2
+    coeiroink-url: ${COEIROINK_URL:http://localhost:50032}
+    google-api-key: ${GOOGLE_TTS_API_KEY:}
+  oauth:
+    # Leave blank to hide the button. Redirect URI to register with the provider:
+    #   {public-base-url}/login/oauth2/code/google   (local dev: http://localhost:5173/login/oauth2/code/google)
+    public-base-url: ${APP_BASE_URL:}
+    google-client-id: ${GOOGLE_CLIENT_ID:}
+    google-client-secret: ${GOOGLE_CLIENT_SECRET:}
+    facebook-client-id: ${FACEBOOK_CLIENT_ID:}
+    facebook-client-secret: ${FACEBOOK_CLIENT_SECRET:}
+  events:
+    # local: in-process (single instance). kafka: durable bot jobs + cross-instance WebSocket fan-out
+    mode: ${VCHAT_EVENTS:local}
+    replicas: ${KAFKA_REPLICAS:1}
+  monitoring:
+    slow-call-ms: ${SLOW_CALL_MS:500}
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}

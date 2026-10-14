@@ -1,0 +1,18 @@
+node_modules/
+dist/
+target/
+cdk.out/
+uploads/
+.env
+.env.local
+*.log
+.env.*
+!.env.example
+# local-only throwaway credentials
+DEV_TEST_ACCOUNTS.md
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db

@@ -1,0 +1,17 @@
+# SQL diagnostics profile. Run with:  mvn -f backend/pom.xml spring-boot:run -Dspring-boot.run.profiles=sql
+# Prints every SQL statement with bound parameters, per-session Hibernate statistics (query count, 2nd-level cache
+# hits/misses, flush counts) and anything slower than 50 ms. Count the "executing N JDBC statements" lines per
+# request to spot N+1 problems.
+spring.jpa.properties.hibernate:
+  generate_statistics: true
+  format_sql: true
+  session.events.log.LOG_QUERIES_SLOWER_THAN_MS: 50
+
+logging.level:
+  com.vchat: DEBUG
+  org.hibernate.SQL: DEBUG
+  org.hibernate.orm.jdbc.bind: TRACE
+  org.hibernate.stat: DEBUG
+  org.hibernate.engine.internal.StatisticalLoggingSessionEventListener: INFO
+  org.hibernate.cache: DEBUG
+  com.zaxxer.hikari.HikariConfig: DEBUG

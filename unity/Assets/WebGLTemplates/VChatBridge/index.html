@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{{ PRODUCT_NAME }}}</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+    #unity-canvas { width: 100%; height: 100%; display: block; background: transparent; }
+  </style>
+</head>
+<body>
+  <canvas id="unity-canvas" tabindex="-1"></canvas>
+  <script src="Build/{{{ LOADER_FILENAME }}}"></script>
+  <script>
+    // Bridge: the VirtualFriends app (parent window) posts {vchat:true, method, value};
+    // forward to the AvatarBridge GameObject. Only SetEmotion / SetMouth are accepted.
+    var ALLOWED = { SetEmotion: true, SetMouth: true };
+    var instance = null;
+    var queue = [];
+    window.addEventListener('message', function (e) {
+      var d = e.data;
+      if (!d || d.vchat !== true || !ALLOWED[d.method]) return;
+      var value = String(d.value);
+      if (instance) instance.SendMessage('AvatarBridge', d.method, value);
+      else queue.push([d.method, value]);
+    });
+    createUnityInstance(document.querySelector('#unity-canvas'), {
+      dataUrl: 'Build/{{{ DATA_FILENAME }}}',
+      frameworkUrl: 'Build/{{{ FRAMEWORK_FILENAME }}}',
+      codeUrl: 'Build/{{{ CODE_FILENAME }}}',
+      streamingAssetsUrl: 'StreamingAssets',
+      companyName: {{{ JSON.stringify(COMPANY_NAME) }}},
+      productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
+      productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
+      webglContextAttributes: { premultipliedAlpha: false, alpha: true },
+    }).then(function (u) {
+      instance = u;
+      queue.forEach(function (q) { u.SendMessage('AvatarBridge', q[0], q[1]); });
+      queue = [];
+    });
+  </script>
+</body>
+</html>
