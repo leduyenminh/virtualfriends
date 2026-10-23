@@ -10,10 +10,11 @@ import Composer from './Composer.jsx';
 const LANG = { vi: 'Tiếng Việt', en: 'English', zh: '中文', ja: '日本語', ko: '한국어', es: 'Español', ru: 'Русский' };
 
 export default function ChatView({ conversation }) {
-  const { messages, typing, me, loadOlder, showAvatar } = useStore();
+  const { messages, typing, me, loadOlder, showAvatar, offline, focusId } = useStore();
   const list = messages[conversation.id] || [];
   const scroller = useRef(null);
   const atBottom = useRef(true);
+  const [flashId, setFlashId] = useState(null);
   const byId = Object.fromEntries(list.map((m) => [m.id, m]));
   const members = Object.fromEntries(conversation.members.map((u) => [u.id, u]));
   const typers = Object.keys(typing[conversation.id] || {});
@@ -33,6 +34,22 @@ export default function ChatView({ conversation }) {
     const el = scroller.current;
     if (el && atBottom.current) el.scrollTop = el.scrollHeight;
   }, [list.length, list[list.length - 1]?.reactions]);
+
+  // Jump to a search hit once it is on screen
+  useEffect(() => {
+    const el = focusId && scroller.current?.querySelector(`[data-mid="${focusId}"]`);
+    if (!el) return;
+    atBottom.current = false;
+    el.scrollIntoView({ block: 'center' });
+    setFlashId(focusId);
+    useStore.setState({ focusId: null });
+  }, [focusId, list.length]);
+
+  useEffect(() => {
+    if (!flashId) return undefined;
+    const t = setTimeout(() => setFlashId(null), 1600);
+    return () => clearTimeout(t);
+  }, [flashId]);
 
   async function onScroll(e) {
     const el = e.currentTarget;
@@ -77,8 +94,8 @@ export default function ChatView({ conversation }) {
           <button className={`icon-btn ${showAvatar ? 'on' : ''}`} title={showAvatar ? 'Hide avatar' : 'Show avatar'}
             onClick={() => useStore.setState({ showAvatar: !showAvatar })}>🎭</button>
         )}
-        <button className={`icon-btn ${conversation.pinned ? 'on' : ''}`} title={conversation.pinned ? 'Unpin chat' : 'Pin chat'} onClick={() => toggle('pinned')}>📌</button>
-        <button className={`icon-btn ${conversation.muted ? 'on' : ''}`} title={conversation.muted ? 'Unmute' : 'Mute notifications'} onClick={() => toggle('muted')}>{conversation.muted ? '🔕' : '🔔'}</button>
+        <button className={`icon-btn ${conversation.pinned ? 'on' : ''}`} title={conversation.pinned ? 'Unpin chat' : 'Pin chat'} disabled={offline} onClick={() => toggle('pinned')}>📌</button>
+        <button className={`icon-btn ${conversation.muted ? 'on' : ''}`} title={conversation.muted ? 'Unmute' : 'Mute notifications'} disabled={offline} onClick={() => toggle('muted')}>{conversation.muted ? '🔕' : '🔔'}</button>
       </div>
       <div className="chat-body">
         <div className="messages" ref={scroller} onScroll={onScroll}>
@@ -99,13 +116,15 @@ export default function ChatView({ conversation }) {
                   showSender={conversation.type === 'GROUP' && first && !mine}
                   replyTo={m.replyToId ? byId[m.replyToId] : null}
                   bot={conversation.bot}
+                  flash={m.id === flashId}
                 />
               </React.Fragment>
             );
           })}
           {!list.length && (
             <div className="day-chip" style={{ textTransform: 'none', marginTop: 24 }}>
-              {conversation.type === 'BOT' ? `Say hi to ${conversation.bot?.name}! Replies are voiced and animated.` : 'No messages yet. Say hello 👋'}
+              {offline ? 'This chat isn’t saved on this device yet. It will be after you open it online.'
+                : conversation.type === 'BOT' ? `Say hi to ${conversation.bot?.name}! Replies are voiced and animated.` : 'No messages yet. Say hello 👋'}
             </div>
           )}
         </div>

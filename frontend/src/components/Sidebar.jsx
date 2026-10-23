@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { api } from '../api.js';
 import { useStore } from '../store.js';
+import { offlineDb } from '../offline/db.js';
 import { listTime } from '../format.js';
 import { readState, Ticks } from '../receipts.jsx';
 import { THEMES } from './ThemePicker.jsx';
@@ -23,24 +24,42 @@ function preview(m) {
   }
 }
 
+/** Search-hit snippet from the offline index: \u0002…\u0003 mark the match. Rendered as text, never as HTML. */
+function Snippet({ text }) {
+  return text.split('\u0002').map((part, i) => {
+    const [hit, rest] = i ? part.split('\u0003') : [null, part];
+    return <React.Fragment key={i}>{hit && <mark>{hit}</mark>}{rest}</React.Fragment>;
+  });
+}
+
 const FILTERS = [['all', 'All'], ['unread', 'Unread'], ['groups', 'Groups'], ['bots', 'AI friends']];
 
 export default function Sidebar() {
-  const { me, conversations, activeId, open, logout, logoutAll, typing, theme, setTheme } = useStore();
+  const { me, conversations, activeId, open, openAt, logout, logoutAll, typing, theme, setTheme, offline, reconnect } = useStore();
   const [q, setQ] = useState('');
   const [results, setResults] = useState([]);
+  const [hits, setHits] = useState([]); // messages saved on this device
   const [filter, setFilter] = useState('all');
   const [modal, setModal] = useState(null);
+  const latestQ = useRef('');
 
   async function search(v) {
     setQ(v);
-    setResults(v.trim().length >= 2 ? (await api.searchUsers(v.trim())).filter((u) => u.id !== me?.id) : []);
+    latestQ.current = v;
+    const t = v.trim();
+    const [people, found] = await Promise.all([
+      t.length >= 2 && !offline ? api.searchUsers(t).catch(() => []) : [],
+      t.length >= 3 ? offlineDb.search(t) : null,
+    ]);
+    if (latestQ.current !== v) return; // a newer keystroke is already searching
+    setResults(people.filter((u) => u.id !== me?.id));
+    setHits(found || []);
   }
 
   async function startDirect(user) {
     const c = await api.createConversation({ type: 'DIRECT', userIds: [user.id] });
     useStore.setState((s) => ({ conversations: s.conversations.some((x) => x.id === c.id) ? s.conversations : [c, ...s.conversations] }));
-    setQ(''); setResults([]);
+    search('');
     open(c.id);
   }
 
@@ -88,10 +107,17 @@ export default function Sidebar() {
         </Menu>
       </div>
 
+      {offline && (
+        <div className="offline-bar" role="status">
+          <span>Offline · showing chats saved on this device</span>
+          <button type="button" className="btn" onClick={reconnect}>Retry</button>
+        </div>
+      )}
+
       <div className="search-row">
         <label className="search">
           <span className="muted" aria-hidden="true">🔍</span>
-          <input id="chat-search" placeholder="Search chats or find people by username" value={q} onChange={(e) => search(e.target.value)} />
+          <input id="chat-search" placeholder="Search chats, messages, or people by username" value={q} onChange={(e) => search(e.target.value)} />
           {q && <button type="button" className="icon-btn" style={{ width: 24, height: 24, fontSize: 13 }} onClick={() => search('')} aria-label="Clear search">✕</button>}
         </label>
       </div>
@@ -142,9 +168,27 @@ export default function Sidebar() {
             </div>
           );
         })}
-        {!filtered.length && !results.length && (
+        {hits.length > 0 && <div className="section-label">Messages</div>}
+        {hits.map(({ message: m, snippet }) => {
+          const c = conversations.find((x) => x.id === m.conversationId);
+          if (!c) return null;
+          const other = c.type === 'DIRECT' ? c.members.find((u) => u.id !== me?.id) : null;
+          return (
+            <div key={m.id} className="conv" onClick={() => openAt(c.id, m.id)}>
+              <Avatar name={c.title} url={other?.avatarUrl} />
+              <div className="meta">
+                <div className="row1">
+                  <span className="name">{c.type === 'BOT' ? '🤖 ' : ''}{c.title}</span>
+                  <span className="when">{listTime(m.createdAt)}</span>
+                </div>
+                <div className="row2"><span className="preview"><Snippet text={snippet} /></span></div>
+              </div>
+            </div>
+          );
+        })}
+        {!filtered.length && !results.length && !hits.length && (
           <div className="muted" style={{ padding: 24, textAlign: 'center' }}>
-            {q ? 'No chats or people match. Usernames need at least 2 letters.' : 'No chats here yet.'}
+            {q ? 'No chats, messages or people match. Usernames need at least 2 letters, messages 3.' : 'No chats here yet.'}
           </div>
         )}
       </div>

@@ -219,7 +219,7 @@ export class VchatStack extends cdk.Stack {
         sources: [s3deploy.Source.asset(dist)],
         destinationBucket: web,
         distribution: webCdn,
-        distributionPaths: ['/index.html'],
+        distributionPaths: ['/index.html', '/sw.js'],
       });
     }
 

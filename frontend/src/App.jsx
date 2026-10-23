@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { onSessionLost, refreshSession, setNotice } from './api.js';
+import { onConnectionLost, onSessionLost, refreshSession, setNotice } from './api.js';
 import { connectRealtime } from './realtime.js';
 import { useStore } from './store.js';
+import { offlineDb } from './offline/db.js';
 import AuthScreen from './components/AuthScreen.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import ChatView from './components/ChatView.jsx';
@@ -38,8 +39,24 @@ function EmptyState() {
   );
 }
 
+/** The server can't be reached: carry on with the chats saved on this device, if there are any. */
+async function fallBackOffline() {
+  const s = useStore.getState();
+  return s.me || await s.bootstrapOffline() ? 'offline' : 'unreachable';
+}
+
+/** Server reachable again: back to normal, or to the sign-in screen if the session ended meanwhile. */
+function reconnect(setStatus) {
+  refreshSession().then(() => setStatus('in')).catch((e) => {
+    if (e.offline) return;
+    setNotice('Your session ended. Please sign in again.');
+    location.reload();
+  });
+}
+
 export default function App() {
-  // 'checking' until the refresh cookie has been tried, then 'in' or 'out'
+  // 'checking' until the refresh cookie has been tried, then 'in' or 'out'; 'offline' when the server can't be reached
+  // and we show the copy saved on this device, 'unreachable' when there is no such copy either
   const [status, setStatus] = useState('checking');
   const { theme, bootstrap, handleEvent, activeId, conversations, showAvatar } = useStore();
   const [error, setError] = useState(null);
@@ -48,23 +65,51 @@ export default function App() {
 
   useEffect(() => {
     // Restore the session from the httpOnly cookie (works after reloads and after Google/Facebook sign-in).
-    refreshSession().then(() => setStatus('in')).catch(() => setStatus('out'));
+    refreshSession().then(() => setStatus('in')).catch(async (e) => setStatus(e.offline ? await fallBackOffline() : 'out'));
     // Session can't be renewed any more (expired / revoked / disabled): start over at the sign-in screen.
     onSessionLost(() => location.reload());
+    // Network gone mid-session: keep showing what we have, read-only.
+    const goOffline = () => setStatus((s) => (s === 'in' && useStore.getState().me ? 'offline' : s));
+    onConnectionLost(goOffline);
+    window.addEventListener('offline', goOffline);
+    useStore.setState({ reconnect: () => reconnect(setStatus) });
     // Signing out in one tab signs out every tab.
     const onStorage = (e) => { if (e.key === 'vchat.signout') location.reload(); };
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('offline', goOffline);
+    };
   }, []);
 
   useEffect(() => {
+    useStore.setState({ offline: status === 'offline' });
+    // The offline copy belongs to the session: at the sign-in screen it is erased.
+    if (status === 'out') offlineDb.purge();
+    if (status === 'offline' || status === 'unreachable') {
+      const retry = () => reconnect(setStatus);
+      const timer = setInterval(retry, 30000);
+      window.addEventListener('online', retry);
+      return () => { clearInterval(timer); window.removeEventListener('online', retry); };
+    }
     if (status !== 'in') return undefined;
-    bootstrap().catch((e) => setError(e.message));
+    setError(null);
+    bootstrap().catch(async (e) => (e.offline ? setStatus(await fallBackOffline()) : setError(e.message)));
     return connectRealtime(handleEvent);
   }, [status]);
 
   if (status === 'checking') return <div className="center-note muted">Loading…</div>;
   if (status === 'out') return <AuthScreen onDone={() => setStatus('in')} />;
+  if (status === 'unreachable') {
+    return (
+      <div className="center-note">
+        <div style={{ textAlign: 'center' }}>
+          <p>Can&apos;t reach VirtualFriends, and no chats are saved on this device yet.</p>
+          <button className="btn" onClick={() => reconnect(setStatus)}>Try again</button>
+        </div>
+      </div>
+    );
+  }
   if (error) return <div className="center-note">Could not load: {error}</div>;
 
   const active = conversations.find((c) => c.id === activeId);

@@ -15,13 +15,17 @@ export default function Composer({ conversation }) {
   const [elapsed, setElapsed] = useState(0);
   const fileRef = useRef(null);
   const typingTimer = useRef(null);
-  const { replyTo, upsertMessage } = useStore();
+  const { replyTo, upsertMessage, offline } = useStore();
 
   useEffect(() => {
     if (!rec) return undefined;
     const t = setInterval(() => setElapsed(Math.floor((Date.now() - rec.started) / 1000)), 500);
     return () => clearInterval(t);
   }, [rec]);
+
+  if (offline) {
+    return <div className="composer offline-note" role="status">You’re offline. You can read saved messages; sending resumes when you’re back online.</div>;
+  }
 
   function onChange(e) {
     setText(e.target.value);

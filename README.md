@@ -37,6 +37,10 @@ design/         Clickable mock screens (open design/mockups.html; earlier stylin
   Picker), or make one in the built-in sticker maker. SVGs are sanitized with DOMPurify.
 - **AI friends:** character sheet, main language (vi/en/zh/ja/ko/es/ru), voice engine and voice, and an avatar. Claude starts
   each reply with an `[emotion:lang]` tag that sets the avatar's expression and picks the TTS language.
+- **Offline history:** chats you open (plus the 20 most recent at startup) are saved in a SQLite database in the browser
+  (`@sqlite.org/sqlite-wasm`, OPFS, `frontend/src/offline/`). Saved messages show instantly, stay readable when the server
+  can't be reached (the production build also caches the app itself with a service worker), and can be searched from the
+  sidebar, accent-insensitive, 3+ characters. Sending is paused while offline. The copy is erased at the sign-in screen.
 
 ## Run locally
 
@@ -154,3 +158,5 @@ requests, 5xx, CPU/memory, Claude failures and recent errors. CI/CD is in `.gith
   For guaranteed delivery use the transactional outbox pattern (an outbox table plus Debezium CDC).
 - Live2D needs Live2D's proprietary Cubism Core (loaded from their CDN). Check their license if you publish commercially.
 - Unity builds must be uncompressed and made with the VChatBridge template (see `unity/README.md`).
+- Offline history is kept by one tab at a time (the OPFS pool can't be shared); other tabs work normally without it.
+  Messages can't be sent offline (no outbox queue yet). Browsers may evict the copy under storage pressure.

@@ -135,6 +135,11 @@ button { cursor: pointer; }
 .badge { background: var(--badge); color: var(--badge-text); border-radius: 999px; font-size: 12px; font-weight: 600; min-width: 20px;
   height: 20px; padding: 0 6px; display: grid; place-items: center; }
 .section-label { padding: 12px 16px 6px; color: var(--accent-strong); font-size: 13px; text-transform: uppercase; letter-spacing: .03em; }
+.conv .preview mark { background: none; color: var(--text); font-weight: 600; }
+.offline-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px 8px 16px; background: var(--chip-on-bg); color: var(--chip-on-text);
+  font-size: 13.5px; flex: none; }
+.offline-bar span { flex: 1; min-width: 0; }
+.offline-bar .btn { padding: 4px 12px; font-size: 13px; }
 
 /* ---------- chat ---------- */
 .chat-body { flex: 1; min-height: 0; position: relative; background-color: var(--chat-bg); }
@@ -148,6 +153,8 @@ button { cursor: pointer; }
 .row { display: flex; position: relative; margin-top: 2px; }
 .row.first { margin-top: 10px; }
 .row.me { justify-content: flex-end; }
+.row.flash .bubble { animation: flash 1.6s ease-out; }
+@keyframes flash { 0%, 40% { box-shadow: 0 0 0 3px var(--accent); } }
 .msg-col { max-width: min(560px, 65%); min-width: 0; display: flex; flex-direction: column; position: relative; }
 .row.me .msg-col { align-items: flex-end; }
 .sender { font-size: 12.8px; font-weight: 500; color: var(--accent-strong); margin-bottom: 2px; }
@@ -195,6 +202,7 @@ button { cursor: pointer; }
 .reply-bar .quote { flex: 1; margin: 0; }
 .composer { background: var(--header-bg); padding: 5px 16px; min-height: 62px; display: flex; gap: 6px; align-items: center; position: relative; flex: none; }
 .composer textarea { flex: 1; resize: none; max-height: 120px; border: none; border-radius: 8px; background: var(--input-bg); padding: 9px 12px; outline: none; }
+.composer.offline-note { justify-content: center; color: var(--muted); font-size: 14px; text-align: center; }
 .send-btn { width: 42px; height: 42px; border-radius: 50%; border: none; background: var(--accent); color: var(--accent-text); font-size: 18px;
   display: grid; place-items: center; flex: none; }
 .send-btn.rec { background: var(--danger); color: #fff; animation: pulse 1s infinite; }
