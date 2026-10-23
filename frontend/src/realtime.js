@@ -1,5 +1,5 @@
 import { Client } from '@stomp/stompjs';
-import { freshToken } from './api.js';
+import { freshToken, ping } from './api.js';
 
 let client;
 
@@ -22,6 +22,8 @@ export function connectRealtime(onEvent) {
     onConnect: () => {
       client.subscribe('/user/queue/events', (frame) => onEvent(JSON.parse(frame.body)));
     },
+    // Socket dropped: if the server itself is gone, ping() makes the app switch to offline mode.
+    onWebSocketClose: () => { ping(); },
   });
   client.activate();
   return () => client.deactivate();

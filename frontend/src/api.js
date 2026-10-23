@@ -9,6 +9,7 @@ let accessToken = null;
 let expiresAt = 0;
 let refreshing = null;
 let sessionLost = () => {};
+let connectionLost = () => {};
 
 try { localStorage.removeItem('vchat.token'); } catch { /* old versions kept the token here */ }
 
@@ -17,10 +18,37 @@ export function setSession(res) { accessToken = res.token; expiresAt = Date.now(
 export function clearSession() { accessToken = null; expiresAt = 0; }
 /** Called when the session can't be renewed (expired, revoked, account disabled). */
 export function onSessionLost(fn) { sessionLost = fn; }
+/** Called when the server can't be reached at all (no network, backend down). */
+export function onConnectionLost(fn) { connectionLost = fn; }
+
+/**
+ * fetch() that tells "can't reach the server" apart from errors the server sent: the former reject with
+ * err.offline = true. A 502/503/504 without a JSON body comes from the load balancer/CDN/dev proxy, not from Spring.
+ */
+async function send(url, init) {
+  let res;
+  try {
+    res = await fetch(url, init);
+  } catch {
+    throw unreachable();
+  }
+  if (res.status >= 502 && res.status <= 504 && !res.headers.get('Content-Type')?.includes('json')) throw unreachable();
+  return res;
+}
+
+function unreachable() {
+  connectionLost();
+  return Object.assign(new Error("Can't reach VirtualFriends. Check your connection."), { offline: true });
+}
+
+/** Cheap reachability check (a public endpoint); when it fails, onConnectionLost fires like for any request. */
+export function ping() {
+  return send(`${BASE}/api/auth/providers`).then(() => true, () => false);
+}
 
 /** Trade the refresh cookie for a new access token. Concurrent callers share one request. */
 export function refreshSession() {
-  refreshing ??= fetch(`${BASE}/api/auth/refresh`, { method: 'POST', credentials: 'include' })
+  refreshing ??= send(`${BASE}/api/auth/refresh`, { method: 'POST', credentials: 'include' })
     .then(async (res) => {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) { clearSession(); throw new Error(body.error || 'Not signed in'); }
@@ -61,7 +89,7 @@ async function req(method, path, body, { raw = false, retry = true } = {}) {
     headers['Content-Type'] = 'application/json';
     payload = JSON.stringify(body);
   }
-  const res = await fetch(BASE + path, { method, headers, body: payload, credentials: 'include' });
+  const res = await send(BASE + path, { method, headers, body: payload, credentials: 'include' });
 
   if (res.status === 401 && !isAuthCall) {
     if (retry) {

@@ -7,7 +7,7 @@ import { Ticks } from '../receipts.jsx';
 
 const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
-export default function MessageBubble({ m, mine, first, status, sender, showSender, replyTo, bot }) {
+export default function MessageBubble({ m, mine, first, status, sender, showSender, replyTo, bot, flash }) {
   const [menu, setMenu] = useState(false);
   const ref = useRef(null);
   const canChange = mine && !m.recalled && Date.now() - new Date(m.createdAt) < 24 * 3600e3;
@@ -70,7 +70,7 @@ export default function MessageBubble({ m, mine, first, status, sender, showSend
 
   const reactions = Object.entries(m.reactions || {});
   return (
-    <div className={`row ${mine ? 'me' : ''} ${first ? 'first' : ''}`}>
+    <div className={`row ${mine ? 'me' : ''} ${first ? 'first' : ''} ${flash ? 'flash' : ''}`} data-mid={m.id}>
       <div className="msg-col" ref={ref}>
         {body}
         {!m.recalled && (
