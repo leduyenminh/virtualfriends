@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -38,6 +39,8 @@ public class BotService {
     private static final Logger log = LoggerFactory.getLogger(BotService.class);
     private static final Pattern TAG = Pattern.compile("^\\s*\\[(\\w+)(?::(\\w{2}))?]\\s*");
     private static final int HISTORY = 40;
+    /** Models that accept the server-side refusal fallback. Claude Haiku 5.5 has none, so it must not be sent there. */
+    private static final Set<String> SERVER_SIDE_FALLBACK = Set.of("claude-sonnet-5-5", "claude-opus-5-5", "claude-opus-5", "claude-fable-5-1");
 
     private final AnthropicClient claude;
     private final ConversationRepo conversations;
@@ -45,12 +48,12 @@ public class BotService {
     private final ChatService chat;
     private final EventPublisher events;
     private final TransactionTemplate tx;
-    private final String model;
+    private final VchatProperties.Ai ai;
 
     public BotService(AnthropicClient claude, ConversationRepo conversations, MessageRepo messages, ChatService chat,
                       EventPublisher events, TransactionTemplate tx, VchatProperties props) {
         this.claude = claude; this.conversations = conversations; this.messages = messages; this.chat = chat;
-        this.events = events; this.tx = tx; this.model = props.ai().model();
+        this.events = events; this.tx = tx; this.ai = props.ai();
     }
 
     private record Turn(boolean assistant, String text) {}
@@ -126,15 +129,19 @@ public class BotService {
                 Do not use markdown, emoji shortcodes or stage directions.
                 """.formatted(bot.getName(), bot.getPersona(), bot.getLanguage());
 
+        // The bot's own model while it is still offered (vchat.ai.models), else the default
+        String model = ai.resolve(bot.getModel());
         MessageCreateParams.Builder b = MessageCreateParams.builder()
                 .model(model)
                 .maxTokens(16000L)
                 .system(system)
                 // Chat replies are short and latency-sensitive: low effort keeps them fast and cheap.
-                .outputConfig(OutputConfig.builder().effort(OutputConfig.Effort.LOW).build())
-                // Server-side refusal fallback: if a safety classifier declines, the API retries on a suitable model.
-                .putAdditionalHeader("anthropic-beta", "server-side-fallback-2026-07-01")
-                .putAdditionalBodyProperty("fallbacks", JsonValue.from("default"));
+                .outputConfig(OutputConfig.builder().effort(OutputConfig.Effort.LOW).build());
+        if (SERVER_SIDE_FALLBACK.contains(model)) {
+            // Server-side refusal fallback: if a safety classifier declines, the API retries on a suitable model.
+            b.putAdditionalHeader("anthropic-beta", "server-side-fallback-2026-07-01")
+                    .putAdditionalBodyProperty("fallbacks", JsonValue.from("default"));
+        }
 
         // Merge consecutive same-role turns and make sure the transcript starts with the user.
         List<Turn> merged = new ArrayList<>();

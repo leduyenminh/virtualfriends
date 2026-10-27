@@ -22,13 +22,18 @@ export default function BotStudio({ onClose, bot }) {
   const [form, setForm] = useState({
     name: bot?.name ?? 'Mika', persona: bot?.persona ?? PRESET_PERSONA, language: bot?.language ?? 'en',
     ttsProvider: bot?.ttsProvider ?? 'BROWSER', voiceId: bot?.voiceId ?? '', avatarModelId: bot?.avatar?.id ?? avatars[0]?.id,
+    model: bot?.model ?? '',
   });
   const [providers, setProviders] = useState({ BROWSER: true });
+  const [models, setModels] = useState([]); // Claude models the server offers, default first
   const [voices, setVoices] = useState([]);
   const [importing, setImporting] = useState(false);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
   useEffect(() => { api.ttsProviders().then(setProviders).catch(() => {}); }, []);
+  useEffect(() => { api.botModels().then(setModels).catch(() => {}); }, []);
+  // A bot without its own model (or with one no longer offered) shows the default
+  const modelValue = models.some((m) => m.id === form.model) ? form.model : (models.find((m) => m.isDefault)?.id ?? '');
   useEffect(() => {
     if (form.ttsProvider === 'BROWSER') {
       const lang = BROWSER_LANGS[form.language];
@@ -39,7 +44,7 @@ export default function BotStudio({ onClose, bot }) {
   }, [form.ttsProvider, form.language]);
 
   async function save() {
-    const body = { ...form, voiceId: form.voiceId || null };
+    const body = { ...form, voiceId: form.voiceId || null, model: modelValue || null };
     const saved = bot ? await api.updateBot(bot.id, body) : await api.createBot(body);
     useStore.setState((s) => ({ bots: [...s.bots.filter((b) => b.id !== saved.id), saved] }));
     if (!bot) {
@@ -68,6 +73,13 @@ export default function BotStudio({ onClose, bot }) {
           </select>
         </div>
       </div>
+      {models.length > 0 && (
+        <div className="field"><label>AI model</label>
+          <select className="input" value={modelValue} onChange={set('model')}>
+            {models.map((m) => <option key={m.id} value={m.id}>{m.label}{m.isDefault ? ' (default)' : ''}</option>)}
+          </select>
+        </div>
+      )}
       <div className="field"><label>Voice</label>
         {voices.length ? (
           <select className="input" value={form.voiceId} onChange={set('voiceId')}>

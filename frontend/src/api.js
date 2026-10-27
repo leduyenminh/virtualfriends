@@ -140,6 +140,7 @@ export const api = {
   avatars: () => req('GET', '/api/avatars'),
   importAvatar: (b) => req('POST', '/api/avatars', b),
   bots: () => req('GET', '/api/bots'),
+  botModels: () => req('GET', '/api/bots/models'),
   createBot: (b) => req('POST', '/api/bots', b),
   updateBot: (id, b) => req('PUT', `/api/bots/${id}`, b),
 

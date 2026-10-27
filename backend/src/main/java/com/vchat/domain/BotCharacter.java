@@ -17,6 +17,8 @@ public class BotCharacter extends BaseEntity {
     @Column(nullable = false) private String language = "en";
     @Enumerated(EnumType.STRING) @Column(name = "tts_provider", nullable = false) private TtsProvider ttsProvider = TtsProvider.BROWSER;
     @Column(name = "voice_id") private String voiceId;
+    /** Claude model id, or null for the server default (see VchatProperties.Ai). */
+    @Column(name = "model") private String model;
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "avatar_model_id") private AvatarModel avatarModel;
     @Column(name = "created_at", nullable = false) private Instant createdAt = Instant.now();
 
@@ -36,6 +38,8 @@ public class BotCharacter extends BaseEntity {
     public void setTtsProvider(TtsProvider v) { ttsProvider = v; }
     public String getVoiceId() { return voiceId; }
     public void setVoiceId(String v) { voiceId = v; }
+    public String getModel() { return model; }
+    public void setModel(String v) { model = v; }
     public AvatarModel getAvatarModel() { return avatarModel; }
     public void setAvatarModel(AvatarModel v) { avatarModel = v; }
 }
