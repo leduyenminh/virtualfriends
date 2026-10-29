@@ -1,5 +1,7 @@
 package com.vchat.web;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.vchat.config.AuthCookies;
 import com.vchat.config.VchatProperties;
 import com.vchat.dto.Dtos.*;
@@ -17,6 +19,7 @@ import java.util.List;
  * Sign-in endpoints. Successful sign-in returns the access token in the JSON body (the SPA keeps it in memory) and
  * sets the refresh token as an httpOnly cookie scoped to /api/auth.
  */
+@Tag(name = "Auth")
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -28,17 +31,20 @@ public class AuthController {
         this.auth = auth; this.cookies = cookies; this.props = props;
     }
 
+    @Operation(summary = "Create an account (returns an access token, sets the refresh cookie)")
     @PostMapping("/register")
     public AuthResponse register(@Valid @RequestBody RegisterRequest r, HttpServletRequest req, HttpServletResponse res) {
         return start(auth.register(r), req, res);
     }
 
+    @Operation(summary = "Sign in with username + password (returns an access token, sets the refresh cookie)")
     @PostMapping("/login")
     public AuthResponse login(@Valid @RequestBody LoginRequest r, HttpServletRequest req, HttpServletResponse res) {
         return start(auth.login(r), req, res);
     }
 
     /** Called on page load and whenever the access token expires. */
+    @Operation(summary = "Exchange the refresh cookie for a new access token (rotates the cookie)")
     @PostMapping("/refresh")
     public AuthResponse refresh(HttpServletRequest req, HttpServletResponse res) {
         requireSameOrigin(req);
@@ -52,6 +58,7 @@ public class AuthController {
         }
     }
 
+    @Operation(summary = "Sign out on this device (revokes the cookie and the current access token)")
     @PostMapping("/logout")
     public void logout(HttpServletRequest req, HttpServletResponse res) {
         requireSameOrigin(req);
@@ -59,6 +66,7 @@ public class AuthController {
         cookies.clear(req, res);
     }
 
+    @Operation(summary = "Sign out on every device")
     @PostMapping("/logout-all")
     public void logoutAll(HttpServletRequest req, HttpServletResponse res) {
         requireSameOrigin(req);
@@ -67,6 +75,7 @@ public class AuthController {
     }
 
     /** Which social login buttons the sign-in screen should show. Start the flow at /oauth2/authorization/{id}. */
+    @Operation(summary = "Social login providers enabled on this server (start at /oauth2/authorization/{id})")
     @GetMapping("/providers")
     public List<String> providers() { return props.oauth() == null ? List.of() : props.oauth().enabledProviders(); }
 

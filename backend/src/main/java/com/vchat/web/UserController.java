@@ -1,5 +1,7 @@
 package com.vchat.web;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.vchat.domain.AppUser;
 import com.vchat.dto.Dtos.*;
 import com.vchat.repo.UserRepo;
@@ -13,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+@Tag(name = "Users")
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
@@ -21,6 +24,7 @@ public class UserController {
 
     public UserController(UserRepo users, PresenceService presence) { this.users = users; this.presence = presence; }
 
+    @Operation(summary = "The signed-in user")
     @GetMapping("/me")
     @Transactional
     public MeDto me() {
@@ -29,6 +33,7 @@ public class UserController {
         return MeDto.of(u);
     }
 
+    @Operation(summary = "Update display name, avatar or theme")
     @PatchMapping("/me")
     @Transactional
     public MeDto update(@Valid @RequestBody UpdateProfileRequest r) {
@@ -39,6 +44,7 @@ public class UserController {
         return MeDto.of(u);
     }
 
+    @Operation(summary = "Find people by username or display name")
     @GetMapping("/search")
     public List<UserDto> search(@RequestParam String q) {
         if (q.isBlank()) return List.of();
@@ -46,6 +52,7 @@ public class UserController {
     }
 
     /** "online" / "last seen at" for up to 100 users (chat headers, group member lists). */
+    @Operation(summary = "Online / last-seen for up to 100 users")
     @GetMapping("/presence")
     public Map<UUID, PresenceDto> presence(@RequestParam List<UUID> ids) {
         if (ids.size() > 100) throw new IllegalArgumentException("At most 100 ids");
