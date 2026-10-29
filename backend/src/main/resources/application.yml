@@ -114,7 +114,10 @@ vchat:
     region: ${AWS_REGION:ap-southeast-1}
     public-base-url: ${MEDIA_BASE_URL:http://localhost:8080/files}
   ai:
-    model: ${CLAUDE_MODEL:claude-opus-5-5}
+    # Claude models for AI friends. Every Claude API model is billed per token; these defaults are the low-cost ones.
+    # model = used when a bot has no choice of its own; models = extra choices users can pick per bot (comma-separated)
+    model: ${CLAUDE_MODEL:claude-sonnet-5-5}
+    models: ${CLAUDE_MODELS:claude-sonnet-5-5,claude-haiku-5-5}
   tts:
     elevenlabs-api-key: ${ELEVENLABS_API_KEY:}
     elevenlabs-model: eleven_multilingual_v2

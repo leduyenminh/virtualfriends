@@ -9,7 +9,7 @@ WhatsApp-style chat with custom sticker packs and VTuber-style AI friends: a 3D/
 | Caching | Redis (Spring Cache, presence, rate limits) · Ehcache (Hibernate 2nd-level cache) |
 | Events | In-process by default · **Kafka** mode for durable bot jobs + multi-instance WebSocket fan-out |
 | Cross-cutting | Spring AOP: service timing/metrics/slow-call log, `@RateLimited` · request-id access log |
-| AI | Claude (`claude-opus-5-5`) via `anthropic-java` for the bot's replies |
+| AI | Claude via `anthropic-java` for the bot's replies: Sonnet 5.5 by default, Haiku 5.5 selectable per bot |
 | Voice | Browser Web Speech (free) · ElevenLabs · Google Cloud TTS · COEIROINK (local, Japanese) |
 | Frontend | React 18 · Vite · Three.js / react-three-fiber · three-vrm · pixi-live2d-display |
 | Avatars | Built-in stick figures · VRM · glTF/GLB (Blender) · Live2D Cubism 4 · Unity WebGL (sandboxed iframe) |
@@ -81,6 +81,7 @@ between two users. To try the bot, open **＋ → New AI friend**.
 
 | Variable | Purpose |
 |---|---|
+| `CLAUDE_MODEL`, `CLAUDE_MODELS` | AI friends' default model (`claude-sonnet-5-5`) and the models users may pick per bot (`claude-sonnet-5-5,claude-haiku-5-5`). Every Claude model is billed per token |
 | `ELEVENLABS_API_KEY`, `GOOGLE_TTS_API_KEY`, `COEIROINK_URL` | Server voice engines |
 | `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` | "Continue with Google". In Google Cloud Console → Credentials → OAuth client (Web), authorized redirect URI: `http://localhost:5173/login/oauth2/code/google` |
 | `FACEBOOK_CLIENT_ID` + `FACEBOOK_CLIENT_SECRET` | "Continue with Facebook". In Meta for Developers → Facebook Login, valid OAuth redirect URI: `http://localhost:5173/login/oauth2/code/facebook` |

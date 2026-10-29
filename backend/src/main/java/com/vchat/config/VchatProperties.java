@@ -32,7 +32,23 @@ public record VchatProperties(
 
     public record Storage(StorageMode mode, String bucket, String region, String publicBaseUrl) {}
 
-    public record Ai(String model) {}
+    /**
+     * Claude models for AI friends: `model` is the default, `models` the extra choices users may pick per bot.
+     * The allow-list is checked again on every reply, so removing a model from it moves its bots back to the default.
+     */
+    public record Ai(String model, List<String> models) {
+        /** The models users may choose, default first. */
+        public List<String> choices() {
+            List<String> out = new ArrayList<>(List.of(model));
+            if (models != null) models.stream().map(String::trim).filter(m -> !m.isEmpty() && !out.contains(m)).forEach(out::add);
+            return out;
+        }
+
+        public boolean allows(String id) { return id != null && choices().contains(id); }
+
+        /** The model a bot actually uses: its own choice while that is still offered, else the default. */
+        public String resolve(String botModel) { return allows(botModel) ? botModel : model; }
+    }
 
     public record Tts(String elevenlabsApiKey, String elevenlabsModel, String coeiroinkUrl, String googleApiKey) {}
 

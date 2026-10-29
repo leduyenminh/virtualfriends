@@ -54,16 +54,21 @@ public final class Dtos {
     }
     public record AvatarRequest(@NotBlank String name, AvatarModel.Format format, @NotBlank String url) {}
 
+    /** model: the bot's own Claude model, or null for the server default. */
     public record BotDto(UUID id, String name, String persona, String language,
-                         BotCharacter.TtsProvider ttsProvider, String voiceId, AvatarDto avatar) {
+                         BotCharacter.TtsProvider ttsProvider, String voiceId, AvatarDto avatar, String model) {
         public static BotDto of(BotCharacter b) {
             return new BotDto(b.getId(), b.getName(), b.getPersona(), b.getLanguage(), b.getTtsProvider(), b.getVoiceId(),
-                    b.getAvatarModel() == null ? null : AvatarDto.of(b.getAvatarModel()));
+                    b.getAvatarModel() == null ? null : AvatarDto.of(b.getAvatarModel()), b.getModel());
         }
     }
+    /** model: one of GET /api/bots/models, or null/blank for the server default. */
     public record BotRequest(@NotBlank String name, @NotBlank String persona,
                              @Pattern(regexp = "vi|en|zh|ja|ko|es|ru") String language,
-                             BotCharacter.TtsProvider ttsProvider, String voiceId, UUID avatarModelId) {}
+                             BotCharacter.TtsProvider ttsProvider, String voiceId, UUID avatarModelId,
+                             @Size(max = 64) String model) {}
+    /** A Claude model users can pick for their AI friends. */
+    public record ModelOption(String id, String label, boolean isDefault) {}
 
     // ---- stickers ----
     public record StickerDto(UUID id, UUID packId, String name, String url, String mimeType) {
