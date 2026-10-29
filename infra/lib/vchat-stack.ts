@@ -142,6 +142,8 @@ export class VchatStack extends cdk.Stack {
           REDIS_SSL: 'true',
           // Viewers use HTTPS at CloudFront, but CloudFront -> ALB is http, so "auto" would drop the Secure flag
           COOKIE_SECURE: 'true',
+          // No Swagger UI / GraphiQL / GraphQL introspection in production (set to 'true' to expose them)
+          API_DOCS_ENABLED: process.env.API_DOCS_ENABLED ?? 'false',
           // Bootstrap admins at deploy time: ADMIN_USERNAMES=alice,bob npx cdk deploy
           ADMIN_USERNAMES: process.env.ADMIN_USERNAMES ?? '',
         },
@@ -202,6 +204,7 @@ export class VchatStack extends cdk.Stack {
       },
       additionalBehaviors: {
         '/api/*': apiBehavior, '/ws': apiBehavior, '/ws/*': apiBehavior,
+        '/graphql': apiBehavior,
         // Google/Facebook sign-in redirect + callback
         '/oauth2/*': apiBehavior, '/login/oauth2/*': apiBehavior,
       },

@@ -102,6 +102,12 @@ public class ChatService {
         return dto;
     }
 
+    /** One conversation the caller belongs to (403 otherwise). */
+    @Transactional(readOnly = true)
+    public ConversationDto get(UUID me, UUID conversationId) {
+        return toDto(membership(me, conversationId).getConversation(), me);
+    }
+
     @Transactional
     public void updateMemberSettings(UUID me, UUID conversationId, MemberSettingsRequest r) {
         ConversationMember m = membership(me, conversationId);

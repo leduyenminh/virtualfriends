@@ -5,6 +5,7 @@ WhatsApp-style chat with custom sticker packs and VTuber-style AI friends: a 3D/
 | Layer | Tech |
 |---|---|
 | Backend | Spring Boot 3.3 (Java 21, virtual threads) · Hibernate/JPA · PostgreSQL 16 · Flyway · STOMP WebSocket |
+| APIs | REST (OpenAPI 3 + Swagger UI) · GraphQL (Spring for GraphQL, GraphiQL) · STOMP for realtime events |
 | Security | Spring Security: 15-min JWT + rotating httpOnly refresh cookie · revocation · USER/ADMIN roles · Google & Facebook OAuth2 · CSP · Redis rate limiting |
 | Caching | Redis (Spring Cache, presence, rate limits) · Ehcache (Hibernate 2nd-level cache) |
 | Events | In-process by default · **Kafka** mode for durable bot jobs + multi-instance WebSocket fan-out |
@@ -22,6 +23,7 @@ backend/perf/   DB tuning guide, seed data, EXPLAIN scripts and measured before/
 frontend/       React app
 unity/          AvatarBridge.cs + WebGL template for Unity avatars
 infra/          AWS CDK stack
+docs/           openapi.yaml (REST spec) and schema.graphql (GraphQL schema), exported from the running app
 design/         Clickable mock screens (open design/mockups.html; earlier styling, before the WhatsApp redesign)
 ```
 
@@ -101,6 +103,36 @@ Frontend (`frontend/.env.local`): `VITE_GOOGLE_CLIENT_ID`, `VITE_GOOGLE_API_KEY`
 | ElevenLabs `eleven_multilingual_v2` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | free tier ~10k chars/month |
 | Google Cloud TTS | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | free tier for standard voices |
 | COEIROINK | | | | ✓ | | | | free, runs locally |
+
+## API documentation
+
+With the backend running locally:
+
+| What | URL |
+|---|---|
+| Swagger UI (try REST calls) | http://localhost:8080/swagger-ui.html |
+| OpenAPI 3 spec | http://localhost:8080/v3/api-docs (JSON), `/v3/api-docs.yaml`; a copy is in `docs/openapi.yaml` |
+| GraphiQL (try GraphQL) | http://localhost:8080/graphiql |
+| GraphQL endpoint | `POST /graphql`; schema in `backend/src/main/resources/graphql/schema.graphqls` and `GET /graphql/schema` |
+
+Both APIs use the same sign-in. Call `POST /api/auth/login`, copy `token` from the response, then click **Authorize** in
+Swagger UI, or put `{"Authorization": "Bearer <token>"}` into **Headers** in GraphiQL. Example query:
+
+```graphql
+{
+  conversations { id title unread lastMessage { content sender { displayName } } }
+}
+```
+
+REST and GraphQL go through the same services, so membership checks, rate limits and admin rules are identical.
+GraphQL adds:
+- **Field selection:** clients fetch exactly what a screen needs in one request.
+- **Batched nested fields:** `Message.sender` and `Message.replyTo` load with one query each per response, whatever the page size.
+- **Abuse limits:** maximum query depth 10 and complexity 300.
+
+Realtime events stay on the STOMP WebSocket rather than GraphQL subscriptions, so the frontend keeps one live connection.
+The docs, GraphiQL and introspection are turned off on AWS (`API_DOCS_ENABLED=false`); set it to `true` to expose them.
+To refresh `docs/openapi.yaml` after changing a controller, download `/v3/api-docs.yaml` from the running app.
 
 ## Architecture notes
 

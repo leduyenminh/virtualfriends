@@ -12,7 +12,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 import org.springframework.web.cors.CorsConfiguration;
@@ -49,10 +48,17 @@ public class SecurityConfig {
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers("/api/auth/**", "/ws/**", "/files/**", "/actuator/health/**",
                                 "/oauth2/**", "/login/oauth2/**").permitAll()
+                        // API docs + GraphiQL (only exist when API_DOCS_ENABLED=true; data calls still need a token)
+                        .requestMatchers("/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui/**", "/swagger-ui.html", "/graphiql/**",
+                                "/graphql/schema").permitAll()
                         .requestMatchers("/api/admin/**", "/actuator/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .exceptionHandling(e -> e
-                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))   // not signed in
+                        .authenticationEntryPoint((req, res, ex) -> {                                 // not signed in
+                            res.setStatus(HttpStatus.UNAUTHORIZED.value());
+                            res.setContentType("application/json");
+                            res.getWriter().write("{\"error\":\"Sign in required (missing, expired or revoked access token)\"}");
+                        })
                         .accessDeniedHandler((req, res, ex) -> {                                       // signed in, wrong role
                             res.setStatus(HttpStatus.FORBIDDEN.value());
                             res.setContentType("application/json");

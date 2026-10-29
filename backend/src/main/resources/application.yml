@@ -8,6 +8,14 @@ spring:
   # Java 21 virtual threads: request threads block on Claude/TTS/DB calls without exhausting a platform-thread pool
   threads.virtual.enabled: true
 
+  graphql:
+    path: /graphql
+    # In-browser IDE at /graphiql. Dev only: set API_DOCS_ENABLED=false in production
+    graphiql.enabled: ${API_DOCS_ENABLED:true}
+    # Introspection lets tools read the schema; turned off with the docs in production
+    schema.introspection.enabled: ${API_DOCS_ENABLED:true}
+    schema.printer.enabled: ${API_DOCS_ENABLED:true}   # GET /graphql/schema returns the SDL
+
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/vchat}
     username: ${DB_USER:vchat}
@@ -79,6 +87,17 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       auto-offset-reset: earliest
+
+springdoc:
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:true}   # /v3/api-docs (JSON), /v3/api-docs.yaml
+  swagger-ui:
+    enabled: ${API_DOCS_ENABLED:true}   # /swagger-ui.html
+    persist-authorization: true
+    tags-sorter: alpha
+    operations-sorter: method
+  paths-to-match: /api/**
+  default-produces-media-type: application/json
 
 management:
   endpoints.web.exposure.include: health,info,metrics

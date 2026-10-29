@@ -1,5 +1,7 @@
 package com.vchat.web;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.vchat.config.VchatProperties;
 import com.vchat.domain.AppUser;
 import com.vchat.domain.AvatarModel;
@@ -18,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+@Tag(name = "Bots & avatars")
 @RestController
 @RequestMapping("/api")
 public class BotController {
@@ -37,6 +40,7 @@ public class BotController {
 
     // ---- Claude models users may pick per bot (vchat.ai.models) ----
 
+    @Operation(summary = "Claude models I can pick for an AI friend")
     @GetMapping("/bots/models")
     public List<ModelOption> models() {
         return ai.choices().stream()
@@ -46,12 +50,14 @@ public class BotController {
 
     // ---- avatar models (built-in stick figures + user imports) ----
 
+    @Operation(summary = "Built-in and my imported avatar models")
     @GetMapping("/avatars")
     @Transactional(readOnly = true)
     public List<AvatarDto> avatars() {
         return avatars.visibleTo(Current.userId()).stream().map(AvatarDto::of).toList();
     }
 
+    @Operation(summary = "Register an uploaded VRM / glTF / Live2D / Unity model")
     @PostMapping("/avatars")
     @Transactional
     public AvatarDto importAvatar(@Valid @RequestBody AvatarRequest r) {
@@ -60,6 +66,7 @@ public class BotController {
         return AvatarDto.of(avatars.save(new AvatarModel(me, r.name(), r.format(), r.url())));
     }
 
+    @Operation(summary = "Delete one of my avatar models")
     @DeleteMapping("/avatars/{id}")
     @Transactional
     public void deleteAvatar(@PathVariable UUID id) {
@@ -70,10 +77,12 @@ public class BotController {
 
     // ---- bot characters ----
 
+    @Operation(summary = "My AI friends")
     @GetMapping("/bots")
     @Transactional(readOnly = true)
     public List<BotDto> list() { return bots.findByOwnerId(Current.userId()).stream().map(BotDto::of).toList(); }
 
+    @Operation(summary = "Create an AI friend")
     @PostMapping("/bots")
     @Transactional
     public BotDto create(@Valid @RequestBody BotRequest r) {
@@ -83,6 +92,7 @@ public class BotController {
         return BotDto.of(bots.save(b));
     }
 
+    @Operation(summary = "Update an AI friend")
     @PutMapping("/bots/{id}")
     @Transactional
     public BotDto update(@PathVariable UUID id, @Valid @RequestBody BotRequest r) {

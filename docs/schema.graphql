@@ -1,0 +1,190 @@
+"""
+VirtualFriends GraphQL API. Same data, rules and authentication as the REST API under /api:
+send `Authorization: Bearer <access token>` with every request (get one from POST /api/auth/login or /api/auth/refresh).
+Realtime updates stay on the STOMP WebSocket (/ws); GraphQL is for reads that need flexible shapes and for mutations.
+"""
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+"ISO-8601 instant in UTC, e.g. 2026-10-29T08:15:30.123Z"
+scalar DateTime
+
+type Query {
+  "The signed-in user."
+  me: Me!
+  "My chats, pinned first, then most recent."
+  conversations: [Conversation!]!
+  "One chat I am a member of."
+  conversation(id: ID!): Conversation
+  "Message history, newest page first returned oldest-to-newest. Page back with before = createdAt of the oldest message."
+  messages(conversationId: ID!, before: DateTime, limit: Int = 50): [Message!]!
+  "Find people by username or display name (at least 2 characters)."
+  searchUsers(query: String!): [User!]!
+  "Online / last-seen for up to 100 users."
+  presence(userIds: [ID!]!): [Presence!]!
+  "My AI friends."
+  bots: [Bot!]!
+  "Built-in and imported avatar models."
+  avatars: [Avatar!]!
+  "My sticker packs."
+  stickerPacks: [StickerPack!]!
+  "Claude models I can pick for an AI friend."
+  botModels: [ModelOption!]!
+  "ADMIN only: users, newest first, optionally filtered."
+  adminUsers(query: String): [AdminUser!]!
+}
+
+type Mutation {
+  sendMessage(conversationId: ID!, input: SendMessageInput!): Message!
+  editMessage(id: ID!, content: String!): Message!
+  "Delete for everyone (own messages, within 24 h)."
+  recallMessage(id: ID!): Message!
+  "Adds the reaction, or removes it if I already reacted with that emoji."
+  toggleReaction(messageId: ID!, emoji: String!): Message!
+  markRead(conversationId: ID!): Boolean!
+  "DIRECT (exactly one userId), GROUP (title + userIds) or BOT (botId). DIRECT returns the existing chat if there is one."
+  createConversation(input: CreateConversationInput!): Conversation!
+  updateConversationSettings(conversationId: ID!, pinned: Boolean, muted: Boolean): Boolean!
+}
+
+type Me {
+  id: ID!
+  username: String!
+  displayName: String!
+  avatarUrl: String
+  theme: String!
+  role: Role!
+}
+
+type User {
+  id: ID!
+  username: String!
+  displayName: String!
+  avatarUrl: String
+  lastSeenAt: DateTime
+}
+
+type Presence {
+  userId: ID!
+  online: Boolean!
+  lastSeenAt: DateTime
+}
+
+type Conversation {
+  id: ID!
+  type: ConversationType!
+  "Group name, bot name, or the other person's name for direct chats."
+  title: String
+  bot: Bot
+  members: [User!]!
+  lastMessage: Message
+  unread: Int!
+  pinned: Boolean!
+  muted: Boolean!
+  updatedAt: DateTime!
+  "When each member last read this chat (drives read ticks)."
+  readBy: [ReadReceipt!]!
+  "History of this chat. Costs one query per conversation: prefer Query.messages for long lists."
+  messages(before: DateTime, limit: Int = 20): [Message!]!
+}
+
+type ReadReceipt {
+  userId: ID!
+  readAt: DateTime!
+}
+
+type Message {
+  id: ID!
+  conversationId: ID!
+  "Null for AI-friend messages (fromBot = true)."
+  sender: User
+  fromBot: Boolean!
+  type: MessageType!
+  content: String
+  sticker: Sticker
+  attachmentUrl: String
+  replyTo: Message
+  createdAt: DateTime!
+  editedAt: DateTime
+  recalled: Boolean!
+  reactions: [Reaction!]!
+}
+
+type Reaction {
+  emoji: String!
+  count: Int!
+  userIds: [ID!]!
+}
+
+type Sticker {
+  id: ID!
+  packId: ID!
+  name: String!
+  url: String!
+  mimeType: String!
+}
+
+type StickerPack {
+  id: ID!
+  name: String!
+  stickers: [Sticker!]!
+}
+
+type Bot {
+  id: ID!
+  name: String!
+  persona: String!
+  language: String!
+  ttsProvider: TtsProvider!
+  voiceId: String
+  avatar: Avatar
+  "The bot's own Claude model, or null for the server default."
+  model: String
+}
+
+type Avatar {
+  id: ID!
+  name: String!
+  format: AvatarFormat!
+  url: String
+  builtIn: Boolean!
+}
+
+type ModelOption {
+  id: String!
+  label: String!
+  isDefault: Boolean!
+}
+
+type AdminUser {
+  id: ID!
+  username: String!
+  displayName: String!
+  role: Role!
+  disabled: Boolean!
+  createdAt: DateTime!
+  lastSeenAt: DateTime
+}
+
+input SendMessageInput {
+  type: MessageType = TEXT
+  content: String
+  stickerId: ID
+  attachmentUrl: String
+  replyToId: ID
+}
+
+input CreateConversationInput {
+  type: ConversationType!
+  userIds: [ID!]
+  title: String
+  botId: ID
+}
+
+enum Role { USER ADMIN }
+enum ConversationType { DIRECT GROUP BOT }
+enum MessageType { TEXT STICKER IMAGE FILE AUDIO SYSTEM }
+enum TtsProvider { BROWSER ELEVENLABS COEIROINK GOOGLE }
+enum AvatarFormat { PLACEHOLDER GLTF VRM LIVE2D UNITY }
