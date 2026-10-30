@@ -1,0 +1,43 @@
+# Web container: serves the React build and proxies the backend paths, so the app, API and WebSocket share one origin
+# (no CORS, SameSite=Strict refresh cookie works). Configured only through environment variables:
+#   SITE_ADDRESS  :8080 (default) behind a platform load balancer / Kubernetes ingress that terminates TLS, or a
+#                 domain such as chat.example.com to have Caddy fetch and renew a Let's Encrypt certificate itself
+#                 (publish ports 80 and 443 and keep /data on a volume)
+#   API_UPSTREAM  host:port of the Spring Boot backend (default backend:8080)
+{
+	admin off
+	servers {
+		# Keep X-Forwarded-Proto/For set by an ingress or load balancer in front of this container
+		trusted_proxies static private_ranges
+	}
+}
+
+{$SITE_ADDRESS::8080} {
+	encode zstd gzip
+
+	# API, WebSocket, GraphQL, Google/Facebook sign-in, LOCAL-mode uploads, and the API docs when enabled
+	@backend path /api/* /ws /ws/* /graphql /graphql/* /oauth2/* /login/oauth2/* /files/* /graphiql* /swagger-ui* /v3/api-docs*
+	# WebSockets are proxied as-is; Spring Boot sets its own security headers on these paths. While the backend is
+	# down Caddy answers 502 with no JSON body, which the app treats as "offline" (api.js) and keeps the local history.
+	handle @backend {
+		reverse_proxy {$API_UPSTREAM:backend:8080}
+	}
+
+	handle {
+		root * /srv
+		# The SPA also ships a Content-Security-Policy <meta> (vite.config.js); these cover what a meta tag can't
+		header {
+			Strict-Transport-Security "max-age=31536000; includeSubDomains"
+			X-Frame-Options DENY
+			X-Content-Type-Options nosniff
+			Referrer-Policy same-origin
+			-Server
+		}
+		# Hashed bundles never change; index.html and the service worker are revalidated so a deploy shows up at once
+		header /assets/* Cache-Control "public, max-age=31536000, immutable"
+		@entry path / /index.html /sw.js
+		header @entry Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}

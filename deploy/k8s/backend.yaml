@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  labels: { app: vchat, component: backend }
+spec:
+  # One instance: the STOMP broker is in memory (VCHAT_EVENTS=local). Recreate also lets a ReadWriteOnce uploads volume
+  # move between nodes. To scale out, switch to Kafka events and S3 storage, then use RollingUpdate and more replicas.
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: vchat, component: backend }
+  template:
+    metadata:
+      labels: { app: vchat, component: backend }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001          # lets the app write to the uploads volume
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: backend
+          image: vchat-backend
+          ports: [{ name: http, containerPort: 8080 }]
+          envFrom:
+            - configMapRef: { name: vchat-config }
+            - secretRef: { name: vchat-secrets }
+          resources:
+            requests: { cpu: 250m, memory: 768Mi }
+            limits: { memory: 1Gi }
+          # Flyway migrations + Hibernate start-up can take a while on a small node
+          startupProbe:
+            httpGet: { path: /actuator/health/liveness, port: http }
+            periodSeconds: 5
+            failureThreshold: 36
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: http }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: http }
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: uploads, mountPath: /app/uploads }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: uploads
+          persistentVolumeClaim: { claimName: uploads-pvc }
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  labels: { app: vchat, component: backend }
+spec:
+  selector: { app: vchat, component: backend }
+  ports: [{ name: http, port: 8080, targetPort: http }]
+---
+# Only used with STORAGE_MODE=LOCAL (delete it and the volume above when uploads go to S3-compatible storage)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: uploads-pvc
+  labels: { app: vchat, component: backend }
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: { storage: 5Gi }

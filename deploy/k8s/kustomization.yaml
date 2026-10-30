@@ -1,0 +1,30 @@
+# Any Kubernetes: k3s on a VM, GKE, AKS, DigitalOcean, Linode, Oracle OKE, Civo, ...
+#   cp deploy/k8s/secrets.env.example deploy/k8s/secrets.env     (fill it in; it's gitignored)
+#   edit config.env and ingress.yaml (your domain), and the image names below
+#   kubectl apply -k deploy/k8s
+# PostgreSQL and Redis are not included: point DB_URL / REDIS_HOST at managed services or at Helm releases.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: vchat
+
+resources:
+  - namespace.yaml
+  - backend.yaml
+  - web.yaml
+  - ingress.yaml
+
+configMapGenerator:
+  - name: vchat-config
+    envs: [config.env]
+secretGenerator:
+  - name: vchat-secrets
+    envs: [secrets.env]
+
+# Images pushed by .github/workflows/ci.yml. GHCR packages start private: make them public, or add an imagePullSecret.
+images:
+  - name: vchat-backend
+    newName: ghcr.io/leduyenminh/vchat-backend
+    newTag: latest
+  - name: vchat-web
+    newName: ghcr.io/leduyenminh/vchat-web
+    newTag: latest

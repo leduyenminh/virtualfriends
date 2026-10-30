@@ -1,10 +1,13 @@
 server:
   port: ${PORT:8080}
-  # Honour X-Forwarded-* from the ALB / Vite proxy so OAuth redirect URLs use the public host
+  # Honour X-Forwarded-* from the web container / ingress / Vite proxy so OAuth redirect URLs use the public host
   forward-headers-strategy: framework
+  # On SIGTERM (container stop, rolling update) finish in-flight requests before exiting
+  shutdown: graceful
 
 spring:
   application.name: vchat
+  lifecycle.timeout-per-shutdown-phase: 20s
   # Java 21 virtual threads: request threads block on Claude/TTS/DB calls without exhausting a platform-thread pool
   threads.virtual.enabled: true
 
@@ -64,6 +67,7 @@ spring:
   data.redis:
     host: ${REDIS_HOST:localhost}
     port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}   # managed Redis (Upstash, Redis Cloud, Aiven, ...) usually also needs REDIS_SSL=true
     ssl.enabled: ${REDIS_SSL:false}
     timeout: 2s
     connect-timeout: 1s
@@ -112,12 +116,12 @@ logging:
     console: "%clr(%d{HH:mm:ss.SSS}){faint} %clr(%5p) %clr([%X{requestId:-}]){magenta} %clr(%-36.36logger{35}){cyan} : %m%n%wEx"
 
 vchat:
-  # No default on purpose. Required (>= 32 chars) under the aws/prod profiles; a random per-run key is used in dev.
+  # No default on purpose. Required (>= 32 chars) under the prod profile; a random per-run key is used in dev.
   jwt-secret: ${JWT_SECRET:}
   auth:
     access-ttl-minutes: ${ACCESS_TTL_MINUTES:15}
     refresh-ttl-days: ${REFRESH_TTL_DAYS:30}
-    # auto = Secure flag when the request is HTTPS. Set true behind a TLS-terminating proxy (CloudFront -> ALB over http)
+    # auto = Secure flag when the request is HTTPS (X-Forwarded-Proto counts). The prod profile defaults to true.
     cookie-secure: ${COOKIE_SECURE:auto}
     # Two tabs refreshing at the same moment present the same token; reuse within this window is not treated as theft
     reuse-grace-seconds: ${REFRESH_REUSE_GRACE_SECONDS:30}
@@ -127,10 +131,16 @@ vchat:
   # Where the browser app lives; OAuth logins redirect back here
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
   storage:
-    # LOCAL writes to ./uploads and serves /files/**; S3 for AWS
+    # LOCAL writes to ./uploads and serves /files/**. S3 = any S3-compatible store (Cloudflare R2, Backblaze B2,
+    # MinIO, DigitalOcean Spaces, ...): set the endpoint, bucket and access keys, and MEDIA_BASE_URL to the bucket's
+    # public URL (e.g. https://media.example.com or https://pub-xxxx.r2.dev).
     mode: ${STORAGE_MODE:LOCAL}
-    bucket: ${MEDIA_BUCKET:vchat-media}
-    region: ${AWS_REGION:ap-southeast-1}
+    bucket: ${STORAGE_BUCKET:vchat-media}
+    endpoint: ${STORAGE_ENDPOINT:}             # e.g. https://<account>.r2.cloudflarestorage.com, http://minio:9000
+    region: ${STORAGE_REGION:us-east-1}        # R2: auto; most others accept us-east-1
+    access-key: ${STORAGE_ACCESS_KEY:}
+    secret-key: ${STORAGE_SECRET_KEY:}
+    path-style: ${STORAGE_PATH_STYLE:true}     # bucket in the path, not the host name; what MinIO and most providers expect
     public-base-url: ${MEDIA_BASE_URL:http://localhost:8080/files}
   ai:
     # Claude models for AI friends. Every Claude API model is billed per token; these defaults are the low-cost ones.

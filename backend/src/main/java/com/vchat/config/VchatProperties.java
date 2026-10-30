@@ -30,7 +30,13 @@ public record VchatProperties(
         }
     }
 
-    public record Storage(StorageMode mode, String bucket, String region, String publicBaseUrl) {}
+    /**
+     * LOCAL: files on disk, served by the backend under /files. S3: any S3-compatible object store (Cloudflare R2,
+     * Backblaze B2, MinIO, DigitalOcean Spaces, ...); `endpoint` points at the provider and `publicBaseUrl` at the
+     * bucket's public (ideally separate) domain.
+     */
+    public record Storage(StorageMode mode, String bucket, String endpoint, String region, String accessKey,
+                          String secretKey, boolean pathStyle, String publicBaseUrl) {}
 
     /**
      * Claude models for AI friends: `model` is the default, `models` the extra choices users may pick per bot.

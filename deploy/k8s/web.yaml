@@ -1,0 +1,41 @@
+# Static React app + same-origin proxy to the backend (frontend/Caddyfile). Stateless, so it can run several replicas.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels: { app: vchat, component: web }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: vchat, component: web }
+  template:
+    metadata:
+      labels: { app: vchat, component: web }
+    spec:
+      containers:
+        - name: web
+          image: vchat-web
+          env:
+            - { name: SITE_ADDRESS, value: ":8080" }   # TLS is the ingress's job
+            - { name: API_UPSTREAM, value: "backend:8080" }
+          ports: [{ name: http, containerPort: 8080 }]
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 256Mi }
+          readinessProbe:
+            httpGet: { path: /, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /, port: http }
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  labels: { app: vchat, component: web }
+spec:
+  selector: { app: vchat, component: web }
+  ports: [{ name: http, port: 80, targetPort: http }]

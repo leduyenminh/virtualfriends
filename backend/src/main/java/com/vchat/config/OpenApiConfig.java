@@ -23,7 +23,7 @@ import java.util.Map;
 /**
  * OpenAPI 3 description of the REST API, generated from the controllers by springdoc:
  *   /v3/api-docs (JSON), /v3/api-docs.yaml, /swagger-ui.html (try requests with "Authorize").
- * Disabled with API_DOCS_ENABLED=false (the AWS stack does this).
+ * Off by default under the prod profile; API_DOCS_ENABLED=true turns them back on.
  */
 @Configuration
 public class OpenApiConfig {

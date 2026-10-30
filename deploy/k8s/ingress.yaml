@@ -1,0 +1,26 @@
+# Everything goes to the web service, which serves the app and proxies /api, /ws, /graphql, /oauth2 and /files.
+# Annotations are for ingress-nginx; other controllers (Traefik on k3s, GKE, ...) need their equivalents for the
+# long WebSocket timeout and the 50 MB upload limit.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vchat
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 50m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    # With cert-manager installed, this gets a Let's Encrypt certificate for the tls section below
+    # cert-manager.io/cluster-issuer: letsencrypt
+spec:
+  # ingressClassName: nginx
+  tls:
+    - hosts: [chat.example.com]
+      secretName: vchat-tls
+  rules:
+    - host: chat.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: web, port: { name: http } }

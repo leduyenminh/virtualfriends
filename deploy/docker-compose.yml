@@ -1,0 +1,93 @@
+# Production stack for one machine: any VPS or free-tier VM (Oracle Cloud Always Free, Hetzner, DigitalOcean, a home
+# server, ...) with Docker and the compose plugin. From the vchat folder:
+#   cp deploy/.env.example deploy/.env        (then fill it in)
+#   docker compose -f deploy/docker-compose.yml up -d --build
+# With SITE_ADDRESS set to a domain whose DNS points at this machine, Caddy gets and renews a TLS certificate itself.
+# The backend runs as one instance (in-memory STOMP broker); see deploy/README.md for scaling out.
+# Its own project name, so it never touches the dev containers and volumes of ../docker-compose.yml (project "vchat").
+name: vchat-prod
+
+services:
+  web:
+    build:
+      context: ../frontend
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+        VITE_GOOGLE_API_KEY: ${VITE_GOOGLE_API_KEY:-}
+        VITE_ONEDRIVE_CLIENT_ID: ${VITE_ONEDRIVE_CLIENT_ID:-}
+    image: ${IMAGE_PREFIX:-vchat}-web:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on: [backend]
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+      API_UPSTREAM: backend:8080
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"   # HTTP/3
+    volumes:
+      - caddy_data:/data               # certificates; losing them means re-issuing (rate limited)
+      - caddy_config:/config
+
+  backend:
+    build: ../backend
+    image: ${IMAGE_PREFIX:-vchat}-backend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
+    # API keys, OAuth clients, JWT_SECRET, STORAGE_* ... (every backend variable in README.md can go in .env)
+    env_file: .env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://db:5432/vchat
+      DB_USER: vchat
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in deploy/.env}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in deploy/.env}
+      REDIS_HOST: redis
+      CORS_ORIGINS: ${APP_URL:?set APP_URL in deploy/.env}
+      FRONTEND_URL: ${APP_URL}
+      APP_BASE_URL: ${APP_URL}
+      MEDIA_BASE_URL: ${MEDIA_BASE_URL:-${APP_URL}/files}
+    volumes:
+      - uploads:/app/uploads           # STORAGE_MODE=LOCAL (the default)
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vchat
+      POSTGRES_USER: vchat
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in deploy/.env}
+    # Same query diagnostics as the dev database, with production thresholds
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements,auto_explain
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - log_min_duration_statement=500
+      - -c
+      - auto_explain.log_min_duration=1000
+      - -c
+      - track_io_timing=on
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vchat -d vchat"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    # Cache only: evict least-recently-used keys when full instead of erroring
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
+
+volumes:
+  caddy_data:
+  caddy_config:
+  uploads:
+  dbdata:

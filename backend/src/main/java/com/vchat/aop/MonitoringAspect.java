@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Performance monitor for the service layer, without touching any service code:
  *  - records a Micrometer timer "vchat.service" (tags: method, outcome) -> /actuator/metrics/vchat.service,
- *    exportable to CloudWatch/Prometheus;
+ *    exportable to Prometheus/OTLP;
  *  - logs every call at DEBUG and anything slower than vchat.monitoring.slow-call-ms at WARN;
  *  - logs unexpected exceptions once, with the method name (expected 4xx errors are not logged as errors).
  * Arguments are never logged: they include passwords and message contents.

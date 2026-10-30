@@ -14,7 +14,7 @@ WhatsApp-style chat with custom sticker packs and VTuber-style AI friends: a 3D/
 | Voice | Browser Web Speech (free) · ElevenLabs · Google Cloud TTS · COEIROINK (local, Japanese) |
 | Frontend | React 18 · Vite · Three.js / react-three-fiber · three-vrm · pixi-live2d-display |
 | Avatars | Built-in stick figures · VRM · glTF/GLB (Blender) · Live2D Cubism 4 · Unity WebGL (sandboxed iframe) |
-| AWS | CloudFront · S3 · ECS Fargate · ALB · RDS PostgreSQL · ElastiCache Redis · Secrets Manager · CloudWatch (CDK) |
+| Deploy | Two container images (Spring Boot; React + Caddy) · docker compose for one VM · Kubernetes (kustomize) · images on GHCR via GitHub Actions · any PostgreSQL / Redis / S3-compatible storage provider |
 | Themes | Light · Dark (WhatsApp-style) · Windows 95 · Frutiger Aero |
 
 ```
@@ -22,7 +22,7 @@ backend/        Spring Boot API + WebSocket
 backend/perf/   DB tuning guide, seed data, EXPLAIN scripts and measured before/after plans
 frontend/       React app
 unity/          AvatarBridge.cs + WebGL template for Unity avatars
-infra/          AWS CDK stack
+deploy/         docker compose (one VM) and Kubernetes manifests; see deploy/README.md
 docs/           openapi.yaml (REST spec) and schema.graphql (GraphQL schema), exported from the running app
 design/         Clickable mock screens (open design/mockups.html; earlier styling, before the WhatsApp redesign)
 ```
@@ -88,8 +88,11 @@ between two users. To try the bot, open **＋ → New AI friend**.
 | `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` | "Continue with Google". In Google Cloud Console → Credentials → OAuth client (Web), authorized redirect URI: `http://localhost:5173/login/oauth2/code/google` |
 | `FACEBOOK_CLIENT_ID` + `FACEBOOK_CLIENT_SECRET` | "Continue with Facebook". In Meta for Developers → Facebook Login, valid OAuth redirect URI: `http://localhost:5173/login/oauth2/code/facebook` |
 | `ADMIN_USERNAMES=alice,bob` | Promote these accounts to ADMIN (at startup / next sign-in) |
-| `JWT_SECRET` | Signing key for access tokens, 32+ random characters. Optional locally (a random key per run is used); **required** on AWS |
+| `JWT_SECRET` | Signing key for access tokens, 32+ random characters. Optional locally (a random key per run is used); **required** in production (`prod` profile) |
 | `VCHAT_EVENTS=kafka` | Kafka mode. First run `docker compose --profile kafka up -d kafka` |
+| `STORAGE_MODE=S3` + `STORAGE_ENDPOINT`, `STORAGE_REGION`, `STORAGE_BUCKET`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`, `MEDIA_BASE_URL` | Keep uploads in any S3-compatible store (Cloudflare R2, Backblaze B2, MinIO, ...) instead of `./uploads`. `MEDIA_BASE_URL` is the bucket's public URL |
+| `DB_URL`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_SSL` | Database and Redis (defaults: the docker-compose ones) |
+| `SPRING_PROFILES_ACTIVE=prod` | Production defaults: JSON logs, `Secure` cookies, API docs off, `JWT_SECRET` required |
 | `LOG_LEVEL=DEBUG`, `SLOW_CALL_MS`, `SLOW_QUERY_MS` | Logging and slow-call thresholds |
 | `-Dspring-boot.run.profiles=sql` (Maven flag) | Print every SQL statement with parameters and Hibernate statistics (N+1 hunting) |
 
@@ -131,7 +134,7 @@ GraphQL adds:
 - **Abuse limits:** maximum query depth 10 and complexity 300.
 
 Realtime events stay on the STOMP WebSocket rather than GraphQL subscriptions, so the frontend keeps one live connection.
-The docs, GraphiQL and introspection are turned off on AWS (`API_DOCS_ENABLED=false`); set it to `true` to expose them.
+The docs, GraphiQL and introspection are off under the `prod` profile; set `API_DOCS_ENABLED=true` to expose them.
 To refresh `docs/openapi.yaml` after changing a controller, download `/v3/api-docs.yaml` from the running app.
 
 ## Architecture notes
@@ -150,7 +153,7 @@ To refresh `docs/openapi.yaml` after changing a controller, download `/v3/api-do
   - **Google/Facebook:** `oauth2Login`. The account is matched on the provider's user id, never on email, which prevents
     account takeover. The session is handed over through the refresh cookie, so no token ever appears in a URL.
   - **Hardening:** a strict Content-Security-Policy on the built app (no `unsafe-eval`; PixiJS is patched), HSTS and
-    X-Frame-Options from CloudFront, Origin checks on the cookie endpoints, BCrypt passwords, and no default `JWT_SECRET`
+    X-Frame-Options from the web container (Caddy), Origin checks on the cookie endpoints, BCrypt passwords, and no default `JWT_SECRET`
     (production refuses to start without a strong one).
   - **Rate limits:** login 10 per username per 5 minutes, sign-up 10 per IP per hour, refresh 60 per IP per minute,
     sending 30 messages per 10 seconds.
@@ -161,32 +164,28 @@ To refresh `docs/openapi.yaml` after changing a controller, download `/v3/api-do
 - **Performance.** See [backend/perf/README.md](backend/perf/README.md): indexes, N+1 fixes, caching layers, measured
   EXPLAIN plans, and the partitioning/sharding roadmap.
 
-## Deploy to AWS
+## Deploy
+
+The app ships as two container images configured only by environment variables, so it runs on any host that runs
+containers, with PostgreSQL, Redis and (optionally) S3-compatible storage from any provider. No cloud account is
+tied in. See [deploy/README.md](deploy/README.md) for the options: one VM with docker compose and automatic HTTPS,
+Kubernetes, or a container platform. The quickest is a single VM:
 
 ```bash
-cd frontend && npm run build
+cp deploy/.env.example deploy/.env
 ```
 
 ```bash
-cd infra && npm install && npx cdk bootstrap && npx cdk deploy
+docker compose -f deploy/docker-compose.yml up -d --build
 ```
 
-Then put the API keys into the `AppSecrets` secret (its ARN is printed as `SecretsArn`) and restart the service. Register
-`https://<AppUrl>/login/oauth2/code/google` (and `/facebook`) with the providers.
-
-```bash
-aws secretsmanager put-secret-value --secret-id <SecretsArn> --secret-string '{"ANTHROPIC_API_KEY":"sk-ant-...","ELEVENLABS_API_KEY":"","GOOGLE_TTS_API_KEY":"","GOOGLE_CLIENT_ID":"","GOOGLE_CLIENT_SECRET":"","FACEBOOK_CLIENT_ID":"","FACEBOOK_CLIENT_SECRET":"","JWT_SECRET":"<keep the generated value>"}'
-```
-
-Logs go to the CloudWatch log group `/vchat/backend` as JSON with `requestId`/`userId` fields (query them with Logs
-Insights). Postgres slow queries and `auto_explain` plans go to the RDS log group. The **VirtualFriends** dashboard shows
-requests, 5xx, CPU/memory, Claude failures and recent errors. CI/CD is in `.github/workflows/deploy.yml`.
+On every push to `main`, `.github/workflows/ci.yml` tests the app and pushes both images (amd64 + arm64) to GitHub
+Container Registry.
 
 ## Known limits / next steps
 
-- AWS runs **one** backend task in `local` event mode. To scale out, set `VCHAT_EVENTS=kafka` with Amazon MSK (Serverless
-  needs the `aws-msk-iam-auth` library), raise `desiredCount`, and keep ALB stickiness on.
-- CloudFront talks to the ALB over HTTP. Add an ACM certificate and a custom domain, and restrict the ALB to CloudFront (prefix list + secret header).
+- Production runs **one** backend instance in `local` event mode. To scale out, set `VCHAT_EVENTS=kafka` (any Kafka:
+  self-hosted, Redpanda, Aiven, Confluent), use S3-compatible storage, and run more replicas with sticky sessions.
 - Kafka events are published after the DB commit. A crash in between can drop one realtime event (clients resync on reload).
   For guaranteed delivery use the transactional outbox pattern (an outbox table plus Debezium CDC).
 - Live2D needs Live2D's proprietary Cubism Core (loaded from their CDN). Check their license if you publish commercially.

@@ -30,7 +30,7 @@ public class JwtService {
     private final Duration ttl;
 
     public JwtService(VchatProperties props, Environment env) {
-        boolean production = env.acceptsProfiles(Profiles.of("aws", "prod"));
+        boolean production = env.acceptsProfiles(Profiles.of("prod"));
         String secret = props.jwtSecret();
         if (secret == null || secret.isBlank()) {
             if (production) throw new IllegalStateException("JWT_SECRET must be set (32+ random characters) in production");

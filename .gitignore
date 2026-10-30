@@ -1,7 +1,7 @@
 node_modules/
 dist/
 target/
-cdk.out/
+deploy/k8s/secrets.env
 uploads/
 .env
 .env.local

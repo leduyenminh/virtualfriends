@@ -1,0 +1,15 @@
+# Production defaults, active with SPRING_PROFILES_ACTIVE=prod (deploy/docker-compose.yml and deploy/k8s set it).
+# Also: JSON logs on stdout (logback-spring.xml) and a required JWT_SECRET (JwtService).
+# Every value can still be overridden with the same environment variable as in application.yml.
+
+spring.graphql:
+  graphiql.enabled: ${API_DOCS_ENABLED:false}
+  schema.introspection.enabled: ${API_DOCS_ENABLED:false}
+  schema.printer.enabled: ${API_DOCS_ENABLED:false}
+
+springdoc:
+  api-docs.enabled: ${API_DOCS_ENABLED:false}
+  swagger-ui.enabled: ${API_DOCS_ENABLED:false}
+
+# Behind a TLS-terminating proxy the hop to the backend is plain HTTP, so don't rely on detecting HTTPS
+vchat.auth.cookie-secure: ${COOKIE_SECURE:true}

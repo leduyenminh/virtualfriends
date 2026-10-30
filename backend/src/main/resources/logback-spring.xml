@@ -1,9 +1,10 @@
 <configuration>
-  <!-- Plain text locally, JSON (one event per line) in AWS so CloudWatch Logs Insights can query fields -->
-  <springProfile name="!aws">
+  <!-- Plain text locally, JSON (one event per line on stdout) under the prod profile, so any log collector
+       (Loki, Grafana Cloud, Better Stack, Datadog, kubectl logs | jq, ...) can query fields like requestId/userId -->
+  <springProfile name="!prod">
     <include resource="org/springframework/boot/logging/logback/base.xml"/>
   </springProfile>
-  <springProfile name="aws">
+  <springProfile name="prod">
     <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
       <encoder class="net.logstash.logback.encoder.LogstashEncoder"/>
     </appender>

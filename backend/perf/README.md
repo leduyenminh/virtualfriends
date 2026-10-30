@@ -11,7 +11,7 @@ How this app keeps PostgreSQL + Hibernate fast, how to measure it yourself, and 
 | Hibernate slow-query log | always on, `SLOW_QUERY_MS` (200 ms) | Any single SQL statement slower than the threshold |
 | SQL profile | `mvn -f backend/pom.xml spring-boot:run -Dspring-boot.run.profiles=sql` | Every statement with bound parameters, plus per-session metrics ("executing **N** JDBC statements"). Use it to spot **N+1** |
 | `pg_stat_statements` | `docker exec -it vchat-db-1 psql -U vchat -d vchat` then `CREATE EXTENSION IF NOT EXISTS pg_stat_statements;` | The most expensive queries over time (query below) |
-| `auto_explain` | on in docker-compose and the RDS parameter group | Postgres logs the actual plan of any statement over 500 ms |
+| `auto_explain` | on in both docker-compose files (dev and `deploy/`) | Postgres logs the actual plan of any statement over 500 ms |
 | `EXPLAIN (ANALYZE, BUFFERS)` | `perf/explain.sql` (below) | Why one specific query is slow |
 
 ```sql
@@ -73,15 +73,15 @@ Chat data (messages, conversations, unread counts) is deliberately **not** cache
 
 **Postgres settings**
 - Autovacuum and analyze run sooner on `message` (5% / 2% instead of 20% / 10%), so planner statistics stay fresh as the table grows.
-- docker-compose and RDS: `pg_stat_statements`, `auto_explain`, `log_min_duration_statement`, `track_io_timing`.
+- docker-compose (dev and `deploy/`): `pg_stat_statements`, `auto_explain`, `log_min_duration_statement`, `track_io_timing`.
 
 ## 4. When it grows: next steps, in order
 
 1. **Denormalized unread counter.** Add `conversation_member.unread_count`, increment it when a message is inserted (in the same transaction, or with a trigger) and zero it on read. That makes unread counts O(1) instead of counting rows.
-2. **Read replica.** Route `@Transactional(readOnly = true)` work to an RDS read replica with `AbstractRoutingDataSource`.
+2. **Read replica.** Route `@Transactional(readOnly = true)` work to a read replica (any managed Postgres offers one) with `AbstractRoutingDataSource`.
 3. **Partition `message` by month** (`PARTITION BY RANGE (created_at)`) when it passes about 100M rows or you need cheap retention (drop old partitions instead of `DELETE`). Caveat: on a partitioned table every unique key must include the partition key, so the PK becomes `(id, created_at)`. The FKs `message_reaction.message_id` and `message.reply_to_id` would then need `created_at` too, or be enforced in the app. Use `pg_partman` to create partitions automatically. Not worth it at the current size.
 4. **Sharding** by `conversation_id` (all of a chat's messages on one shard): Citus (a Postgres extension) keeps SQL and JPA working. At "Discord scale" teams move messages to a wide-column store (Cassandra or ScyllaDB) keyed by `(conversation_id, time bucket)`. This app is far from that point. A single tuned Postgres handles millions of users' worth of chat metadata.
 
 ## 5. Why PostgreSQL rather than MariaDB
 
-Both are fine relational databases, but this app relies on things Postgres does better or MariaDB lacks: `pg_trgm` trigram indexes for `%term%` search, partial indexes (`WHERE ... IS NOT NULL`), `INCLUDE` covering indexes, a native `uuid` type, `timestamptz`, `pg_stat_statements` and `auto_explain`, and first-class support on RDS and Aurora. Switching would remove features without a performance gain. All the techniques above (indexing, EXPLAIN, N+1 avoidance, L2 cache, batching, partitioning) apply equally to MariaDB if you ever need it: use `EXPLAIN ANALYZE` / `ANALYZE FORMAT=JSON` and the slow query log there.
+Both are fine relational databases, but this app relies on things Postgres does better or MariaDB lacks: `pg_trgm` trigram indexes for `%term%` search, partial indexes (`WHERE ... IS NOT NULL`), `INCLUDE` covering indexes, a native `uuid` type, `timestamptz`, `pg_stat_statements` and `auto_explain`, and first-class support from every managed database provider. Switching would remove features without a performance gain. All the techniques above (indexing, EXPLAIN, N+1 avoidance, L2 cache, batching, partitioning) apply equally to MariaDB if you ever need it: use `EXPLAIN ANALYZE` / `ANALYZE FORMAT=JSON` and the slow query log there.

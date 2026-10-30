@@ -4,7 +4,8 @@ import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-// In dev, proxy API/WebSocket/OAuth/local files to Spring Boot so everything is same-origin (as behind CloudFront).
+// In dev, proxy API/WebSocket/OAuth/local files to Spring Boot so everything is same-origin (as in production, where
+// the web container's Caddyfile does the same).
 // VCHAT_API overrides the backend address, e.g. VCHAT_API=http://localhost:8081
 const api = process.env.VCHAT_API ?? 'http://localhost:8080';
 
@@ -77,7 +78,7 @@ self.addEventListener('fetch', (e) => {
   },
 };
 
-/** Backend down in dev: answer 503 like the AWS load balancer does, so the app switches to offline mode (not a 500). */
+/** Backend down in dev: answer 503 like a load balancer does, so the app switches to offline mode (not a 500). */
 const target = (url) => ({
   target: url,
   configure: (proxy) => proxy.on('error', (err, req, res) => {

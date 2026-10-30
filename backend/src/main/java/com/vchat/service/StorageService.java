@@ -2,6 +2,7 @@ package com.vchat.service;
 
 import com.vchat.config.VchatProperties;
 import com.vchat.dto.Dtos.UploadResponse;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -19,8 +20,9 @@ import java.util.UUID;
 import static java.util.Map.entry;
 
 /**
- * Stores stickers, attachments and avatar models. Locally files land in ./uploads; on AWS they go to S3 and are
- * served from a separate CloudFront domain, which keeps user-supplied SVG/HTML off the app origin.
+ * Stores stickers, attachments and avatar models. LOCAL mode writes to ./uploads (a volume in containers); S3 mode
+ * writes to any S3-compatible object store served from its own domain, which keeps user-supplied SVG/HTML off the
+ * app origin.
  */
 @Service
 public class StorageService {
@@ -39,9 +41,9 @@ public class StorageService {
             entry("data", "application/octet-stream"));
 
     private final VchatProperties.Storage cfg;
-    private final S3Client s3;
+    private final ObjectProvider<S3Client> s3;
 
-    public StorageService(VchatProperties props, S3Client s3) { this.cfg = props.storage(); this.s3 = s3; }
+    public StorageService(VchatProperties props, ObjectProvider<S3Client> s3) { this.cfg = props.storage(); this.s3 = s3; }
 
     public UploadResponse store(UUID owner, Kind kind, MultipartFile file) throws IOException {
         String ext = extension(file.getOriginalFilename());
@@ -76,7 +78,7 @@ public class StorageService {
     private void put(String key, String type, MultipartFile file) throws IOException {
         try (InputStream in = file.getInputStream()) {
             if (cfg.mode() == VchatProperties.StorageMode.S3) {
-                s3.putObject(PutObjectRequest.builder().bucket(cfg.bucket()).key(key).contentType(type)
+                s3.getObject().putObject(PutObjectRequest.builder().bucket(cfg.bucket()).key(key).contentType(type)
                                 .cacheControl("public, max-age=31536000, immutable").build(),
                         RequestBody.fromInputStream(in, file.getSize()));
             } else {
