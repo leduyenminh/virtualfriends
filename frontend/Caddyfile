@@ -4,11 +4,17 @@
 #                 domain such as chat.example.com to have Caddy fetch and renew a Let's Encrypt certificate itself
 #                 (publish ports 80 and 443 and keep /data on a volume)
 #   API_UPSTREAM  host:port of the Spring Boot backend (default backend:8080)
+#   Behind Cloudflare, so per-IP rate limits see the visitor and not Cloudflare (see deploy/README.md):
+#   CLIENT_IP_HEADERS  header holding the visitor's address (default X-Forwarded-For; Cf-Connecting-Ip for Cloudflare)
+#   TRUSTED_PROXIES    who may set it (default private_ranges, which covers cloudflared, an ingress or a load
+#                      balancer on the same network; add Cloudflare's ranges when its proxy connects here directly)
 {
 	admin off
 	servers {
-		# Keep X-Forwarded-Proto/For set by an ingress or load balancer in front of this container
-		trusted_proxies static private_ranges
+		trusted_proxies static {$TRUSTED_PROXIES:private_ranges}
+		client_ip_headers {$CLIENT_IP_HEADERS:X-Forwarded-For}
+		# Read X-Forwarded-For right to left, skipping trusted proxies, so an address a client made up can't win
+		trusted_proxies_strict
 	}
 }
 
@@ -20,7 +26,10 @@
 	# WebSockets are proxied as-is; Spring Boot sets its own security headers on these paths. While the backend is
 	# down Caddy answers 502 with no JSON body, which the app treats as "offline" (api.js) and keeps the local history.
 	handle @backend {
-		reverse_proxy {$API_UPSTREAM:backend:8080}
+		reverse_proxy {$API_UPSTREAM:backend:8080} {
+			# Spring takes the first X-Forwarded-For entry as the client, so send only the address worked out above
+			header_up X-Forwarded-For {client_ip}
+		}
 	}
 
 	handle {

@@ -1,7 +1,9 @@
 package com.vchat.config;
 
 import io.jsonwebtoken.JwtException;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.config.ChannelRegistration;
@@ -9,6 +11,7 @@ import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
@@ -26,12 +29,23 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @Configuration
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+    /**
+     * STOMP heart-beats as [server sends every, server expects every] ms. Proxies such as Cloudflare close a WebSocket
+     * after ~100 s without traffic, and the browser client (realtime.js asks for 20 s) gives up after 40 s of silence.
+     * The broker checks every 10 s, so its pings arrive at most ~30 s apart. It doesn't require pings back: browsers
+     * throttle timers in background tabs, and a late client ping must not get a healthy socket closed.
+     */
+    static final long[] HEARTBEAT = {10_000, 0};
+
     private final JwtService jwt;
     private final TokenRevocationService revocation;
     private final VchatProperties props;
+    private final TaskScheduler heartbeatScheduler;
 
-    public WebSocketConfig(JwtService jwt, TokenRevocationService revocation, VchatProperties props) {
-        this.jwt = jwt; this.revocation = revocation; this.props = props;
+    /** The scheduler is the one Spring's WebSocket config declares; @Lazy breaks the cycle with that config. */
+    public WebSocketConfig(JwtService jwt, TokenRevocationService revocation, VchatProperties props,
+                           @Lazy @Qualifier("messageBrokerTaskScheduler") TaskScheduler heartbeatScheduler) {
+        this.jwt = jwt; this.revocation = revocation; this.props = props; this.heartbeatScheduler = heartbeatScheduler;
     }
 
     @Override
@@ -41,7 +55,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.enableSimpleBroker("/queue", "/topic");
+        registry.enableSimpleBroker("/queue", "/topic").setHeartbeatValue(HEARTBEAT).setTaskScheduler(heartbeatScheduler);
         registry.setApplicationDestinationPrefixes("/app");
         registry.setUserDestinationPrefix("/user");
     }

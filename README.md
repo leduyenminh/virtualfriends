@@ -179,6 +179,9 @@ cp deploy/.env.example deploy/.env
 docker compose -f deploy/docker-compose.yml up -d --build
 ```
 
+To put Cloudflare in front for free (HTTPS without open ports through Cloudflare Tunnel, uploads in R2), see
+[deploy/README.md](deploy/README.md#cloudflare-tunnel-https-and-r2-free).
+
 On every push to `main`, `.github/workflows/ci.yml` tests the app and pushes both images (amd64 + arm64) to GitHub
 Container Registry.
 

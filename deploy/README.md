@@ -35,8 +35,8 @@ docker compose -f deploy/docker-compose.yml up -d --build
 Caddy fetches a Let's Encrypt certificate for `SITE_ADDRESS` on first start. To use the CI images instead of
 building on the VM, set `IMAGE_PREFIX=ghcr.io/<owner>/vchat` in `.env` and run `docker compose ... pull` before `up -d`.
 
-No public IP (home server, or a VM behind NAT)? Set `SITE_ADDRESS=:80` and publish it with Cloudflare Tunnel, which
-also terminates TLS.
+No public IP (home server, or a VM behind NAT), or rather not open ports? Publish it through
+[Cloudflare Tunnel](#cloudflare-tunnel-https-and-r2-free) instead.
 
 Day-to-day:
 
@@ -79,6 +79,61 @@ as two services:
 - **web:** `SITE_ADDRESS=:8080` (or `:$PORT` if the platform assigns one) and `API_UPSTREAM=<backend's private
   host:port>`. The platform must support WebSockets and allow 50 MB request bodies.
 - Register `https://<your domain>/login/oauth2/code/google` (and `/facebook`) with the sign-in providers.
+
+## Cloudflare: Tunnel, HTTPS and R2 (free)
+
+Cloudflare can sit in front of option 1 at no cost: HTTPS, CDN and DDoS protection without opening any port (so it
+also works from a home PC), plus R2 for uploads. It can't run PostgreSQL or Redis; those stay in the compose stack.
+Do these steps in the dashboard (dash.cloudflare.com). Menu names move around now and then; the dashboard's search
+finds them.
+
+1. **Domain.** *Websites → Add a domain*, then switch the nameservers at your registrar (or buy a domain under
+   *Domain Registration*). Quick tunnels on `trycloudflare.com` are for testing only: their address changes on every
+   start, which breaks the sign-in redirect URIs.
+2. **Tunnel.** *Zero Trust → Networks → Tunnels → Create a tunnel → Cloudflared*, name it `vchat`. Copy the token
+   from the install command it shows (the long string after `--token`); don't run that command. Add a public
+   hostname (called a *route* in newer dashboards): `chat.yourdomain.com` → service **HTTP**, URL **`web:80`**.
+3. **`.env`.** Use the *Cloudflare Tunnel* block of `.env.example`: `SITE_ADDRESS=:80`,
+   `APP_URL=https://chat.yourdomain.com`, the ports bound to `127.0.0.1`, `TUNNEL_TOKEN`, and
+   `CLIENT_IP_HEADERS=Cf-Connecting-Ip` (otherwise per-IP rate limits see addresses a client can fake). Then start:
+
+   ```bash
+   docker compose -f deploy/docker-compose.yml --profile tunnel up -d --build
+   ```
+
+   `docker compose -f deploy/docker-compose.yml logs cloudflared` should show `Registered tunnel connection`.
+4. **Domain settings.** The app's Content-Security-Policy blocks scripts Cloudflare injects, so turn these off:
+   *Rocket Loader* (it rewrites the app's script tags; the app may not load), *Email Address Obfuscation*, and
+   automatic *Web Analytics*. Turn *Always Use HTTPS* on.
+5. **Sign-in providers.** Register `https://chat.yourdomain.com/login/oauth2/code/google` (and `/facebook`).
+
+Good to know: the free plan accepts uploads up to 100 MB (the app's limit is 50 MB), and Cloudflare closes a
+WebSocket after ~100 s of silence, which the backend's 20 s STOMP heart-beats prevent. On Kubernetes, run `cloudflared`
+as a Deployment with the same token and route the hostname to `http://web.vchat.svc:80`.
+
+### R2 for uploads (optional)
+
+On one machine the `uploads` volume is fine. R2 (10 GB, a million uploads and ten million downloads a month free, no
+download fees) takes the files off the server. Cloudflare asks for a card or PayPal before enabling R2, even though
+usage within the free tier costs nothing. Switch before you have real users: files already on the volume aren't
+copied, and their `/files/...` links stop working in S3 mode.
+
+1. *R2 Object Storage → Create bucket* `vchat-media`.
+2. Bucket *Settings → Custom Domains → Connect* `media.yourdomain.com` (the free `r2.dev` address is rate-limited and
+   meant for testing). A different hostname from the app keeps uploaded SVG/HTML away from the app's origin.
+3. Bucket *Settings → CORS policy*. `*` because Unity avatars load from a sandboxed iframe whose origin is `null`:
+
+   ```json
+   [{ "AllowedOrigins": ["*"], "AllowedMethods": ["GET", "HEAD"], "AllowedHeaders": ["*"], "MaxAgeSeconds": 86400 }]
+   ```
+
+4. *R2 → Manage API tokens → Create API token*: **Object Read & Write**, applied to `vchat-media` only. Copy the
+   Access Key ID and Secret Access Key (shown once). The account ID is on the R2 overview page.
+5. In `.env`: `STORAGE_MODE=S3`, `STORAGE_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com`,
+   `STORAGE_REGION=auto`, `STORAGE_BUCKET=vchat-media`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`,
+   `MEDIA_BASE_URL=https://media.yourdomain.com`. Restart with the same `up -d` command.
+6. Optional: *Rules → Transform Rules → Modify response header* for `media.yourdomain.com`, set
+   `X-Content-Type-Options: nosniff`.
 
 ## Object storage notes
 
